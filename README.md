@@ -1,5 +1,5 @@
 # WAWebSessionTransfer
-Save a Whatsapp Web Session to a file and run it everywhere! 
+Save Whatsapp Web Sessions to a file and run it everywhere! 
 
 # Requirements:
 If you want to run the .py files you will need:
