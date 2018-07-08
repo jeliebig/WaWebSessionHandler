@@ -6,7 +6,7 @@ If you want to run the .py files you will need:
 - Chrome or Firefox
 - Selenium (pip install selenium)
 - Chromedriver and Geckodriver (copy them in the same folder as the scripts)
-- optional: py2exe 32bit
+- optional: py2exe 32bit (could also work with 64bit)
 
 # How to use:
 Run WAWebTransfer.py and it will scan Firefox and Chrome for a whatsapp web session that will be saved at saves/"username"@"hostname".lwa.
