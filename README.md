@@ -9,7 +9,7 @@ If you want to run the .py files you will need:
 - optional: py2exe 32bit
 
 # How to use:
-Run WAWebTransfer.py and it will scan Firefox and Chrome for a whatsapp web session that will be saved at saves/"username"@"hostname".lwa
+Run WAWebTransfer.py and it will scan Firefox and Chrome for a whatsapp web session that will be saved at saves/"username"@"hostname".lwa.
 Now you can run WADisplay.py to open Chrome or Firefox with a session that you stored in the saves directory
 
 # Build Windows exe:
