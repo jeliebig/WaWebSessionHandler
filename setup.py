@@ -12,7 +12,7 @@ required_data_files = ['geckodriver.exe', 'chromedriver.exe',
                          '{}\\firefox\\webdriver_prefs.json'.format(wd_path)])]
 
 setup(
-    console=['WADisplay.py'],
+    console=['WAWebTransfer.py'],
     data_files=required_data_files,
     options={
         "py2exe": {
