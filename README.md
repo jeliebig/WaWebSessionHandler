@@ -23,3 +23,4 @@ you may have to change the command if it uses the wrong python interpreter
 
 - If you use Google Chrome with different profiles WAWebTransfer.py will only take the session from the default profile.
 - If you close the browser window of WADisplay.py the webdriver will still be running. (make sure to close it through the console window)
+- py2exe is not able to build a single executable
