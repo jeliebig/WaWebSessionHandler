@@ -17,7 +17,7 @@ Now you can run WADisplay.py to open Chrome or Firefox with a session that you s
 - Open cmd in the folder with the scripts and run: "setup.py py2exe"
 you may have to change the command if it uses the wrong python interpreter
 - create a saves folder in the dist directory
-- to make it protable: copy the dist folder to an usb-drive and create a link to the WAWebTransfer.exe from the dist folder to the root folder (if you want you can change the settings of the console window in the properties of the link file)
+- to make it portable: copy the dist folder to an usb-drive and create a link to the WAWebTransfer.exe from the dist folder to the root folder (if you want you can change the settings of the console window in the properties of the link file)
 
 # Known Issues:
 
