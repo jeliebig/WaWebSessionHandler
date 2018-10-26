@@ -45,6 +45,9 @@ if platform.system() == "Windows":
     except webexcept.WebDriverException:
         gotChrome = False
 
+    if not os.path.isdir("saves"):
+        os.mkdir("saves")
+
     if gotFirefox:
         windir = os.listdir(os.environ['APPDATA'] + '\Mozilla\Firefox\Profiles')
         for profile in windir:
@@ -62,7 +65,7 @@ if platform.system() == "Windows":
     if gotChrome:
         options = webdriver.ChromeOptions()
         windir = os.environ['USERPROFILE'] + '\Appdata\Local\Google\Chrome\User Data'
-        profileList.append()
+        profileList.append("")
         for profileDir in os.listdir(windir):
             if "Profile" in profileDir:
                 if profileDir != "System Profile":
