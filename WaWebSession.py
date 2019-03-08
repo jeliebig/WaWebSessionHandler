@@ -73,12 +73,12 @@ class WaWebSession:
         self.Storage = {}
         if profile:
             if self.choice == 1:
-                chromeProfile = self.Options
-                chromeProfile.add_argument('user-data-dir=%s' % self.dir + '\\' + profile)
-                self.driver = webdriver.Chrome(options=chromeProfile)
+                chrome_profile = self.Options
+                chrome_profile.add_argument('user-data-dir=%s' % self.dir + '\\' + profile)
+                self.driver = webdriver.Chrome(options=chrome_profile)
             else:
-                fireProfile = webdriver.FirefoxProfile(self.dir + '\\' + profile)
-                self.driver = webdriver.Firefox(fireProfile, options=self.Options)
+                fire_profile = webdriver.FirefoxProfile(self.dir + '\\' + profile)
+                self.driver = webdriver.Firefox(fire_profile, options=self.Options)
             self.driver.get('https://web.whatsapp.com/')
             for key, value in get(self.driver).items():
                 try:
@@ -90,12 +90,12 @@ class WaWebSession:
         else:
             for file in self.profiles:
                 if self.choice == 1:
-                    chromeProfile = self.Options
-                    chromeProfile.add_argument('user-data-dir=%s' % self.dir + '\\' + file)
-                    self.driver = webdriver.Chrome(options=chromeProfile)
+                    chrome_profile = self.Options
+                    chrome_profile.add_argument('user-data-dir=%s' % self.dir + '\\' + file)
+                    self.driver = webdriver.Chrome(options=chrome_profile)
                 else:
-                    fireProfile = webdriver.FirefoxProfile(self.dir + '\\' + file)
-                    self.driver = webdriver.Firefox(fireProfile, options=self.Options)
+                    fire_profile = webdriver.FirefoxProfile(self.dir + '\\' + file)
+                    self.driver = webdriver.Firefox(fire_profile, options=self.Options)
                 self.Storage = {}
                 self.driver.get('https://web.whatsapp.com/')
                 for key, value in get(self.driver).items():
@@ -124,13 +124,14 @@ class WaWebSession:
         self.driver.quit()
         return self.Storage
 
-    def view(self, dict=None, file=None):  # TODO: improve view method | maybe if localStorage could help
-        localStorage = dict
-        if not localStorage and not file:
+    def view(self, dict=None, file=None):  # TODO: improve view method | maybe if dict could help
+        if not dict and not file:
             print('No arguments.\n'
                   'Please use view(dict=localStorage_dict)\n'
                   'or         view(file="path")\n')
             raise SyntaxError
+        if "\\" in file:
+            file = file.replace("\\", "/")
         options = self.Options
         options.headless = False
         if self.choice == 1:
@@ -142,19 +143,20 @@ class WaWebSession:
                 lsfile = stor.readlines()
             lines = []
             for line in lsfile:
-                line.strip('\n')
-                lines.append(line.replace('\n', ''))
+                line = line.replace('\n', '')
+                if line != '':
+                    lines.append(line)
             self.driver.get('https://web.whatsapp.com/')
             for line in lines:
                 line = str(line)
                 stor = line.split(' : ')
-                self.driver.execute_script(('window.localStorage.setItem("%s", "%s")' % (stor[0], stor[1])))
+                self.driver.execute_script(("window.localStorage.setItem('%s', '%s')" % (stor[0], stor[1])))
             self.driver.refresh()
             input('Press Enter to close WhatsApp Web...')
             self.driver.quit()
-        elif str(type(localStorage)) == '<class "dict">':
-            for item in localStorage:
-                if str(type(localStorage[item])) != '<class "str">':
+        elif str(type(dict)) == '<class "dict">':
+            for item in dict:
+                if str(type(dict[item])) != '<class "str">':
                     print('Format of dict should be > key:value')
                     raise SyntaxError
                 else:
@@ -163,8 +165,8 @@ class WaWebSession:
                     else:
                         self.driver = webdriver.Firefox(options=options)
                     self.driver.get('https://web.whatsapp.com/')
-                    for key in localStorage:
-                        self.driver.execute_script(('window.localStorage.setItem("%s", "%s")' % (key, localStorage[key])))
+                    for key in dict:
+                        self.driver.execute_script(("window.localStorage.setItem('%s', '%s')" % (key, dict[key])))
                     self.driver.refresh()
                     input('Press Enter to close WhatsApp Web...')
                     self.driver.quit()
@@ -202,50 +204,49 @@ class WaWebSession:
                 elif str(type(session[item])) == "<class 'dict'>":
                     single = False
                     if name:
-                        if os.path.isfile(path + '\\' + name + '.lwa'):
-                            print('File already exists.')
-                            raise os.error
+                        if item == "":
+                            if os.path.isfile(path + '\\' + name + '.lwa'):
+                                print('File already exists.')
+                                raise os.error
+                        else:
+                            if os.path.isfile(path + '\\' + name + '-' + item + '.lwa'):
+                                print('File already exists.')
+                                raise os.error
                     else:
-                        if os.path.isfile(path + '\\SessionFile.lwa'):
-                            print('File already exists.')
-                            raise os.error
+                        if item == "":
+                            if os.path.isfile(path + '\\SessionFile.lwa'):
+                                print('File already exists.')
+                                raise os.error
+                        else:
+                            if os.path.isfile(path + '\\SessionFile-' + item + '.lwa'):
+                                print('File already exists.')
+                                raise os.error
 
                     for key in session[item]:
-                        checked = False
                         if name:
                             if item == "":
                                 with open(path + '\\' + name + '.lwa', 'a') as file:
                                     try:
-                                        file.writelines(key + ' : ' + session[item][key] + '\n')
+                                        file.write(key + ' : ' + session[item][key] + '\n')
                                     except UnicodeEncodeError:
                                         pass
                             else:
-                                if not checked:
-                                    if os.path.isfile(path + '\\' + name + '-' + item + '.lwa'):
-                                        print('File already exists.')
-                                        raise os.error
-                                    checked = True
                                 with open(path + '\\' + name + '-' + item + '.lwa', 'a') as file:
                                     try:
-                                        file.writelines(key + ' : ' + session[item][key] + '\n')
+                                        file.write(key + ' : ' + session[item][key] + '\n')
                                     except UnicodeEncodeError:
                                         pass
                         else:
                             if item == "":
                                 with open(path + '\\SessionFile.lwa', 'a') as file:
                                     try:
-                                        file.writelines(key + ' : ' + session[item][key] + '\n')
+                                        file.write(key + ' : ' + session[item][key] + '\n')
                                     except UnicodeEncodeError:
                                         pass
                             else:
-                                if not checked:
-                                    if os.path.isfile(path + '\\SessionFile-' + item + '.lwa'):
-                                        print('File already exists.')
-                                        raise os.error
-                                    checked = True
                                 with open(path + '\\SessionFile-' + item + '.lwa', 'a') as file:
                                     try:
-                                        file.writelines(key + ' : ' + session[item][key] + '\n')
+                                        file.write(key + ' : ' + session[item][key] + '\n')
                                     except UnicodeEncodeError:
                                         pass
                     if name:
