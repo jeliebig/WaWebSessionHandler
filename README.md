@@ -1,4 +1,4 @@
-# WAWebSessionHandler
+# WaWebSessionHandler
 Save Whatsapp Web Sessions to files and run them everywhere! 
 
 # Requirements:
