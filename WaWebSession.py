@@ -124,8 +124,8 @@ class WaWebSession:
         self.driver.quit()
         return self.Storage
 
-    def view(self, dict=None, file=None):  # TODO: improve view method | maybe if dict could help
-        if not dict and not file:
+    def view(self, s_dict=None, file=None):  # TODO: improve view method | maybe if dict could help
+        if not s_dict and not file:
             print('No arguments.\n'
                   'Please use view(dict=localStorage_dict)\n'
                   'or         view(file="path")\n')
@@ -154,9 +154,9 @@ class WaWebSession:
             self.driver.refresh()
             input('Press Enter to close WhatsApp Web...')
             self.driver.quit()
-        elif str(type(dict)) == '<class "dict">':
-            for item in dict:
-                if str(type(dict[item])) != '<class "str">':
+        elif str(type(s_dict)) == '<class "dict">':
+            for item in s_dict:
+                if str(type(s_dict[item])) != '<class "str">':
                     print('Format of dict should be > key:value')
                     raise SyntaxError
                 else:
@@ -165,8 +165,8 @@ class WaWebSession:
                     else:
                         self.driver = webdriver.Firefox(options=options)
                     self.driver.get('https://web.whatsapp.com/')
-                    for key in dict:
-                        self.driver.execute_script(("window.localStorage.setItem('%s', '%s')" % (key, dict[key])))
+                    for key in s_dict:
+                        self.driver.execute_script(("window.localStorage.setItem('%s', '%s')" % (key, s_dict[key])))
                     self.driver.refresh()
                     input('Press Enter to close WhatsApp Web...')
                     self.driver.quit()
@@ -259,6 +259,10 @@ class WaWebSession:
                             print('File saved to: ' + path + '\\SessionFile.lwa')
                         else:
                             print('File saved to: ' + path + '\\SessionFile-' + item + '.lwa')
+                else:
+                    print("Please check your session dict. It should provide a string or dict\n"
+                          "Read: https://github.com/jeliebig/WAWebSessionHandler#session-dict-design")
+                    raise SyntaxError
             if single:
                 if name:
                     print('File saved to: ' + path + '\\' + name + '.lwa')
@@ -280,4 +284,4 @@ if __name__ == '__main__':
     else:
         if not os.path.isdir('saves'):
             os.mkdir('saves')
-        web.save2file(web.get_active(), 'saves')
+        web.save2file(web.get_active(), 'saves', name=input("Enter a name for the file: "))
