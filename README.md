@@ -8,7 +8,7 @@ If you want to run the .py file you will need:
 - Chromedriver and Geckodriver (copy them in the same folder as the scripts)
 
 # How to use:
-You could simply run "WaWebSession.py" and use it as a script, or you could import the "WaWebSession"-Class in your script and work with it.
+You could simply run "WaWebSession.py" and use it as a script, or you could import the "WaWebSession"-Class in your file and work with it.
 
 # Syntax:
 -  WaWebSession() -> creates a new instance of WaWebSession()
@@ -33,14 +33,3 @@ You could simply run "WaWebSession.py" and use it as a script, or you could impo
 - multiple profiles:
     - profile -> key -> value
     - dict[profile][key] = value
-
-
-# Unsupported for now:
-Build Windows binary yourself:
-- Check if the paths of setup.py are correct for you
-- Open cmd in the folder with the scripts and run: "setup.py py2exe" (you may have to change the command if it uses the wrong python interpreter)
-- create a saves folder in the dist directory
-- to make it portable: copy the dist folder to an usb-drive and create a link to the WAWebTransfer.exe from the dist folder to the root folder (if you want you can change the settings of the console window in the properties of the link file)
-
-Known Issues:
-- py2exe is not able to build a single executable
