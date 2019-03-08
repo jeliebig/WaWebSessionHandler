@@ -8,7 +8,7 @@ If you want to run the .py file you will need:
 - Chromedriver and Geckodriver (copy them in the same folder as the scripts)
 
 # How to use:
-You could simply run "WaWebSession.py" and use it as a script, or you could import the "WaWebSession"-Class in your script and work with it.
+You could simply run "WaWebSession.py" and use it as a script, or you could import the "WaWebSession"-Class in your file and work with it.
 
 # Syntax:
 -  WaWebSession() -> creates a new instance of WaWebSession()
