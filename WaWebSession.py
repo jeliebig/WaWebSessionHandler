@@ -1,7 +1,8 @@
-from selenium import webdriver
-from selenium.webdriver.firefox.options import Options as fireOptions
 import os
 import platform
+
+from selenium import webdriver
+from selenium.webdriver.firefox.options import Options as fireOptions
 
 
 # Stack Overflow Code but I don't have the source anymore :/
@@ -55,7 +56,6 @@ class WaWebSession:
                     raise OSError
             else:
                 self.Options = fireOptions()
-                self.Options.set_preference
                 self.Options.headless = True
                 if self.platform == 'windows':
                     self.dir = os.environ['APPDATA'] + '\\Mozilla\\Firefox\\Profiles'
@@ -139,9 +139,9 @@ class WaWebSession:
             self.driver = webdriver.Firefox(options=options)
         if file:
             with open(file, 'r') as stor:
-                localStorageFile = stor.readlines()
+                lsfile = stor.readlines()
             lines = []
-            for line in localStorageFile:
+            for line in lsfile:
                 line.strip('\n')
                 lines.append(line.replace('\n', ''))
             self.driver.get('https://web.whatsapp.com/')
@@ -172,7 +172,7 @@ class WaWebSession:
             print('Format of dict should be > key:value')
             raise SyntaxError
 
-    def save2file(self, localStorage, path, name=None):
+    def save2file(self, session, path, name=None):
         if name:
             try:
                 name = str(name)
@@ -185,9 +185,9 @@ class WaWebSession:
         except Exception as e:
             print('Folder does not exist.\n', e)
             raise os.error
-        if str(type(localStorage)) == "<class 'dict'>":
-            for item in localStorage:
-                if str(type(localStorage[item])) == "<class 'str'>":
+        if str(type(session)) == "<class 'dict'>":
+            for item in session:
+                if str(type(session[item])) == "<class 'str'>":
                     single = True
                     if name:
                         if os.path.isfile(path + '\\' + name + '.lwa'):
@@ -195,11 +195,11 @@ class WaWebSession:
                             raise os.error
                         with open(path + '\\' + name + '.lwa', 'a') as file:
                             try:
-                                file.writelines(item + ' : ' + localStorage[item])
+                                file.writelines(item + ' : ' + session[item])
                             except UnicodeEncodeError:
                                 pass
 
-                elif str(type(localStorage[item])) == "<class 'dict'>":
+                elif str(type(session[item])) == "<class 'dict'>":
                     single = False
                     if name:
                         if os.path.isfile(path + '\\' + name + '.lwa'):
@@ -210,13 +210,13 @@ class WaWebSession:
                             print('File already exists.')
                             raise os.error
 
-                    for key in localStorage[item]:
+                    for key in session[item]:
                         checked = False
                         if name:
                             if item == "":
                                 with open(path + '\\' + name + '.lwa', 'a') as file:
                                     try:
-                                        file.writelines(key + ' : ' + localStorage[item][key] + '\n')
+                                        file.writelines(key + ' : ' + session[item][key] + '\n')
                                     except UnicodeEncodeError:
                                         pass
                             else:
@@ -227,14 +227,14 @@ class WaWebSession:
                                     checked = True
                                 with open(path + '\\' + name + '-' + item + '.lwa', 'a') as file:
                                     try:
-                                        file.writelines(key + ' : ' + localStorage[item][key] + '\n')
+                                        file.writelines(key + ' : ' + session[item][key] + '\n')
                                     except UnicodeEncodeError:
                                         pass
                         else:
                             if item == "":
                                 with open(path + '\\SessionFile.lwa', 'a') as file:
                                     try:
-                                        file.writelines(key + ' : ' + localStorage[item][key] + '\n')
+                                        file.writelines(key + ' : ' + session[item][key] + '\n')
                                     except UnicodeEncodeError:
                                         pass
                             else:
@@ -245,7 +245,7 @@ class WaWebSession:
                                     checked = True
                                 with open(path + '\\SessionFile-' + item + '.lwa', 'a') as file:
                                     try:
-                                        file.writelines(key + ' : ' + localStorage[item][key] + '\n')
+                                        file.writelines(key + ' : ' + session[item][key] + '\n')
                                     except UnicodeEncodeError:
                                         pass
                     if name:
