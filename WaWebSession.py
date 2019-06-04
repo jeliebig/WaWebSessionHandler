@@ -23,6 +23,7 @@ class WaWebSession:
         try:
             self.platform = platform.system().lower()
             self.driver = None
+            self.path = os.path.dirname(os.path.realpath(__file__))
             self.pStorage = {}
             self.Storage = {}
             if browser:
@@ -42,26 +43,38 @@ class WaWebSession:
                 self.choice = int(input('Select a number from the list: '))
             if self.choice == 1:
                 self.Options = webdriver.ChromeOptions()
-                self.Options.headless = True
+                self.Options.headless = False
                 if self.platform == 'windows':
                     self.dir = os.environ['USERPROFILE'] + '\\Appdata\\Local\\Google\\Chrome\\User Data'
-                    self.profiles = []
-                    self.profiles.append('')
-                    for profileDir in os.listdir(self.dir):
-                        if 'Profile' in profileDir:
-                            if profileDir != 'System Profile':
-                                self.profiles.append(profileDir)
+                elif self.platform == 'linux':
+                    self.dir = os.environ['HOME'] + '/.config/google-chrome'
                 else:
-                    print('Only Windows is supported now.')
+                    print('Only Windows and Linux are working by now.')
                     raise OSError
+                self.profiles = []
+                self.profiles.append('')
+                for profileDir in os.listdir(self.dir):
+                    if 'Profile' in profileDir:
+                        if profileDir != 'System Profile':
+                            self.profiles.append(profileDir)
             else:
                 self.Options = fireOptions()
-                self.Options.headless = True
+                self.Options.headless = False
                 if self.platform == 'windows':
                     self.dir = os.environ['APPDATA'] + '\\Mozilla\\Firefox\\Profiles'
                     self.profiles = os.listdir(self.dir)
+                elif self.platform == 'linux':
+                    self.dir = os.environ['HOME'] + '/.mozilla/firefox'
+                    # TODO: consider reading out the profiles.ini
+                    self.profiles = []
+                    for profileDir in os.listdir(self.dir):
+                        print(profileDir)
+                        if '.default' in profileDir:
+                            if os.path.isdir(self.dir + '/' + profileDir):
+                                self.profiles.append(profileDir)
+                    print(self.profiles)
                 else:
-                    print('Only Windows is supported by now.')
+                    print('Only Windows and Linux are working by now.')
                     raise OSError
         except Exception as e:
             print('Something went wrong: ', e)
@@ -74,11 +87,21 @@ class WaWebSession:
         if profile:
             if self.choice == 1:
                 chrome_profile = self.Options
-                chrome_profile.add_argument('user-data-dir=%s' % self.dir + '\\' + profile)
-                self.driver = webdriver.Chrome(options=chrome_profile)
+                if self.platform == "windows":
+                    chrome_profile.add_argument('user-data-dir=%s' % self.dir + '\\' + profile)
+                elif self.platform == "linux":
+                    chrome_profile.add_argument('user-data-dir=%s' % self.dir + '/' + profile)
+                if self.platform == 'linux':
+                    self.driver = webdriver.Chrome((self.path + '/chromedriver'), options=chrome_profile)
+                else:
+                    self.driver = webdriver.Chrome(options=chrome_profile)
             else:
-                fire_profile = webdriver.FirefoxProfile(self.dir + '\\' + profile)
-                self.driver = webdriver.Firefox(fire_profile, options=self.Options)
+                if self.platform == "windows":
+                    fire_profile = webdriver.FirefoxProfile(self.dir + '\\' + profile)
+                    self.driver = webdriver.Firefox(fire_profile, options=self.Options)
+                elif self.platform == "linux":
+                    fire_profile = webdriver.FirefoxProfile(self.dir + '/' + profile)
+                    self.driver = webdriver.Firefox((self.path + '/geckodriver'), fire_profile, options=self.Options)
             self.driver.get('https://web.whatsapp.com/')
             for key, value in get(self.driver).items():
                 try:
@@ -91,11 +114,23 @@ class WaWebSession:
             for file in self.profiles:
                 if self.choice == 1:
                     chrome_profile = self.Options
-                    chrome_profile.add_argument('user-data-dir=%s' % self.dir + '\\' + file)
-                    self.driver = webdriver.Chrome(options=chrome_profile)
+                    if self.platform == "windows":
+                        chrome_profile.add_argument('user-data-dir=%s' % self.dir + '\\' + file)
+                    elif self.platform == "linux":
+                        chrome_profile.add_argument('user-data-dir=%s' % self.dir + '/' + file)
+                    if self.platform == 'linux':
+                        self.driver = webdriver.Chrome((self.path + '/chromedriver'), options=chrome_profile)
+                    else:
+                        self.driver = webdriver.Chrome(options=chrome_profile)
                 else:
-                    fire_profile = webdriver.FirefoxProfile(self.dir + '\\' + file)
-                    self.driver = webdriver.Firefox(fire_profile, options=self.Options)
+                    if self.platform == "windows":
+                        fire_profile = webdriver.FirefoxProfile(self.dir + '\\' + file)
+                        self.driver = webdriver.Firefox(fire_profile, options=self.Options)
+                    elif self.platform == "linux":
+                        fire_profile = webdriver.FirefoxProfile(self.dir + '/' + file)
+                        # TODO: Geckodriver crash no attribute
+                        self.driver = webdriver.Firefox((self.path + '/geckodriver'), fire_profile,
+                                                        options=self.Options)
                 self.Storage = {}
                 self.driver.get('https://web.whatsapp.com/')
                 for key, value in get(self.driver).items():
@@ -111,9 +146,16 @@ class WaWebSession:
         options = self.Options
         options.headless = False
         if self.choice == 1:
-            self.driver = webdriver.Chrome(options=options)
+            if self.platform == 'linux':
+                self.driver = webdriver.Chrome((self.path + '/chromedriver'), options=options)
+            else:
+                self.driver = webdriver.Chrome(options=options)
         else:
-            self.driver = webdriver.Firefox(options=options)
+            if self.platform == 'linux':
+                self.driver = webdriver.Firefox((self.path + '/geckodriver'),
+                                                options=options)
+            else:
+                self.driver = webdriver.Firefox(options=options)
         self.driver.get('https://web.whatsapp.com/')
         input('Please log in and press Enter...')
         for key, value in get(self.driver).items():
@@ -135,9 +177,16 @@ class WaWebSession:
         options = self.Options
         options.headless = False
         if self.choice == 1:
-            self.driver = webdriver.Chrome(options=options)
+            if self.platform == 'linux':
+                self.driver = webdriver.Chrome((self.path + '/chromedriver'), options=options)
+            else:
+                self.driver = webdriver.Chrome(options=options)
         else:
-            self.driver = webdriver.Firefox(options=options)
+            if self.platform == 'linux':
+                self.driver = webdriver.Firefox((self.path + '/geckodriver'),
+                                                options=options)
+            else:
+                self.driver = webdriver.Firefox(options=options)
         if file:
             with open(file, 'r') as stor:
                 lsfile = stor.readlines()
@@ -161,9 +210,16 @@ class WaWebSession:
                     raise SyntaxError
                 else:
                     if self.choice == 1:
-                        self.driver = webdriver.Chrome(chrome_options=options)
+                        if self.platform == 'linux':
+                            self.driver = webdriver.Chrome((self.path + '/chromedriver'), chrome_options=options)
+                        else:
+                            self.driver = webdriver.Chrome(chrome_options=options)
                     else:
-                        self.driver = webdriver.Firefox(options=options)
+                        if self.platform == 'linux':
+                            self.driver = webdriver.Firefox((self.path + '/geckodriver'),
+                                                            options=options)
+                        else:
+                            self.driver = webdriver.Firefox(options=options)
                     self.driver.get('https://web.whatsapp.com/')
                     for key in s_dict:
                         self.driver.execute_script(("window.localStorage.setItem('%s', '%s')" % (key, s_dict[key])))
@@ -261,7 +317,7 @@ class WaWebSession:
                             print('File saved to: ' + path + '\\SessionFile-' + item + '.lwa')
                 else:
                     print("Please check your session dict. It should provide a string or dict\n"
-                          "Read: https://github.com/jeliebig/WAWebSessionHandler#session-dict-design")
+                          "Read: https://github.com/jeliebig/WAWebSessionHandler#session-dict-design\n")
                     raise SyntaxError
             if single:
                 if name:
