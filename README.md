@@ -5,7 +5,8 @@ Save Whatsapp Web Sessions to files and run them everywhere!
 If you want to run the .py file you will need:
 - Chrome or Firefox
 - Selenium (pip install selenium)
-- Chromedriver and Geckodriver (copy them in the same folder as the scripts)
+- Chromedriver and/or Geckodriver (copy them in the same folder as the script)
+    - make sure they can be executed by running "chmod +x"
 
 # How to use:
 You could simply run "WaWebSession.py" and use it as a script, or you could import the "WaWebSession"-Class in your file and work with it.
