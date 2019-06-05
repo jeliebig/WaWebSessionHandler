@@ -96,9 +96,9 @@ class WaWebSession:
                     self.driver = webdriver.Chrome(options=chrome_profile)
             else:
                 fire_profile = webdriver.FirefoxProfile(self.dir + self.cd + profile)
-                if self.platform == "windows":
+                if self.platform == 'windows':
                     self.driver = webdriver.Firefox(fire_profile, options=self.Options)
-                elif self.platform == "linux":
+                elif self.platform == 'linux':
                     self.driver = webdriver.Firefox(fire_profile, executable_path=(self.path + '/geckodriver'),
                                                     options=self.Options)
             self.driver.get('https://web.whatsapp.com/')
@@ -120,9 +120,9 @@ class WaWebSession:
                         self.driver = webdriver.Chrome(options=chrome_profile)
                 else:
                     fire_profile = webdriver.FirefoxProfile(self.dir + self.cd + file)
-                    if self.platform == "windows":
+                    if self.platform == 'windows':
                         self.driver = webdriver.Firefox(fire_profile, options=self.Options)
-                    elif self.platform == "linux":
+                    elif self.platform == 'linux':
                         self.driver = webdriver.Firefox(fire_profile, executable_path=(self.path + '/geckodriver'),
                                                         options=self.Options)
                 self.Storage = {}
@@ -166,8 +166,8 @@ class WaWebSession:
                   'Please use view(dict=localStorage_dict)\n'
                   'or         view(file="path")\n')
             raise SyntaxError
-        if "\\" in file:
-            file = file.replace("\\", "/")
+        if '\\' in file:
+            file = file.replace('\\', '/')
         options = self.Options
         options.headless = False
         if self.choice == 1:
@@ -254,7 +254,7 @@ class WaWebSession:
                 elif str(type(session[item])) == "<class 'dict'>":
                     single = False
                     if name:
-                        if item == "":
+                        if item == '':
                             if os.path.isfile(path + self.cd + name + '.lwa'):
                                 print('File already exists.')
                                 raise os.error
@@ -263,7 +263,7 @@ class WaWebSession:
                                 print('File already exists.')
                                 raise os.error
                     else:
-                        if item == "":
+                        if item == '':
                             if os.path.isfile(path + self.cd + 'SessionFile.lwa'):
                                 print('File already exists.')
                                 raise os.error
@@ -274,7 +274,7 @@ class WaWebSession:
 
                     for key in session[item]:
                         if name:
-                            if item == "":
+                            if item == '':
                                 with open(path + self.cd + name + '.lwa', 'a') as file:
                                     try:
                                         file.write(key + ' : ' + session[item][key] + '\n')
@@ -287,7 +287,7 @@ class WaWebSession:
                                     except UnicodeEncodeError:
                                         pass
                         else:
-                            if item == "":
+                            if item == '':
                                 with open(path + self.cd + 'SessionFile.lwa', 'a') as file:
                                     try:
                                         file.write(key + ' : ' + session[item][key] + '\n')
@@ -300,18 +300,18 @@ class WaWebSession:
                                     except UnicodeEncodeError:
                                         pass
                     if name:
-                        if item == "":
+                        if item == '':
                             print('File saved to: ' + path + self.cd + name + '.lwa')
                         else:
                             print('File saved to: ' + path + self.cd + 'SessionFile-' + item + '.lwa')
                     else:
-                        if item == "":
+                        if item == '':
                             print('File saved to: ' + path + self.cd + 'SessionFile.lwa')
                         else:
                             print('File saved to: ' + path + self.cd + 'SessionFile-' + item + '.lwa')
                 else:
-                    print("Please check your session dict. It should provide a string or dict\n"
-                          "Read: https://github.com/jeliebig/WAWebSessionHandler#session-dict-design\n")
+                    print('Please check your session dict. It should provide a string or dict\n'
+                          'Read: https://github.com/jeliebig/WAWebSessionHandler#session-dict-design\n')
                     raise SyntaxError
             if single:
                 if name:
@@ -334,4 +334,4 @@ if __name__ == '__main__':
     else:
         if not os.path.isdir('saves'):
             os.mkdir('saves')
-        web.save2file(web.get_active(), 'saves', name=input("Enter a name for the file: "))
+        web.save2file(web.get_active(), 'saves', name=input('Enter a name for the file: '))
