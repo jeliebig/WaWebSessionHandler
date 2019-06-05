@@ -22,7 +22,12 @@ class WaWebSession:
     def __init__(self, browser=None):
         try:
             self.platform = platform.system().lower()
+            if self.platform == 'windows':
+                self.cd = '\\'
+            else:
+                self.cd = '/'
             self.driver = None
+            self.path = os.path.dirname(os.path.realpath(__file__))
             self.pStorage = {}
             self.Storage = {}
             if browser:
@@ -45,23 +50,33 @@ class WaWebSession:
                 self.Options.headless = True
                 if self.platform == 'windows':
                     self.dir = os.environ['USERPROFILE'] + '\\Appdata\\Local\\Google\\Chrome\\User Data'
-                    self.profiles = []
-                    self.profiles.append('')
-                    for profileDir in os.listdir(self.dir):
-                        if 'Profile' in profileDir:
-                            if profileDir != 'System Profile':
-                                self.profiles.append(profileDir)
+                elif self.platform == 'linux':
+                    self.dir = os.environ['HOME'] + '/.config/google-chrome'
                 else:
-                    print('Only Windows is supported now.')
+                    print('Only Windows and Linux are working by now.')
                     raise OSError
+                self.profiles = []
+                self.profiles.append('')
+                for profileDir in os.listdir(self.dir):
+                    if 'Profile' in profileDir:
+                        if profileDir != 'System Profile':
+                            self.profiles.append(profileDir)
             else:
                 self.Options = fireOptions()
                 self.Options.headless = True
                 if self.platform == 'windows':
                     self.dir = os.environ['APPDATA'] + '\\Mozilla\\Firefox\\Profiles'
                     self.profiles = os.listdir(self.dir)
+                elif self.platform == 'linux':
+                    self.dir = os.environ['HOME'] + '/.mozilla/firefox'
+                    # TODO: consider reading out the profiles.ini
+                    self.profiles = []
+                    for profileDir in os.listdir(self.dir):
+                        if '.default' in profileDir:
+                            if os.path.isdir(self.dir + '/' + profileDir):
+                                self.profiles.append(profileDir)
                 else:
-                    print('Only Windows is supported by now.')
+                    print('Only Windows and Linux are working by now.')
                     raise OSError
         except Exception as e:
             print('Something went wrong: ', e)
@@ -74,11 +89,18 @@ class WaWebSession:
         if profile:
             if self.choice == 1:
                 chrome_profile = self.Options
-                chrome_profile.add_argument('user-data-dir=%s' % self.dir + '\\' + profile)
-                self.driver = webdriver.Chrome(options=chrome_profile)
+                chrome_profile.add_argument('user-data-dir=%s' % self.dir + self.cd + profile)
+                if self.platform == 'linux':
+                    self.driver = webdriver.Chrome((self.path + '/chromedriver'), options=chrome_profile)
+                else:
+                    self.driver = webdriver.Chrome(options=chrome_profile)
             else:
-                fire_profile = webdriver.FirefoxProfile(self.dir + '\\' + profile)
-                self.driver = webdriver.Firefox(fire_profile, options=self.Options)
+                fire_profile = webdriver.FirefoxProfile(self.dir + self.cd + profile)
+                if self.platform == "windows":
+                    self.driver = webdriver.Firefox(fire_profile, options=self.Options)
+                elif self.platform == "linux":
+                    self.driver = webdriver.Firefox(fire_profile, executable_path=(self.path + '/geckodriver'),
+                                                    options=self.Options)
             self.driver.get('https://web.whatsapp.com/')
             for key, value in get(self.driver).items():
                 try:
@@ -91,11 +113,18 @@ class WaWebSession:
             for file in self.profiles:
                 if self.choice == 1:
                     chrome_profile = self.Options
-                    chrome_profile.add_argument('user-data-dir=%s' % self.dir + '\\' + file)
-                    self.driver = webdriver.Chrome(options=chrome_profile)
+                    chrome_profile.add_argument('user-data-dir=%s' % self.dir + self.cd + file)
+                    if self.platform == 'linux':
+                        self.driver = webdriver.Chrome((self.path + '/chromedriver'), options=chrome_profile)
+                    else:
+                        self.driver = webdriver.Chrome(options=chrome_profile)
                 else:
-                    fire_profile = webdriver.FirefoxProfile(self.dir + '\\' + file)
-                    self.driver = webdriver.Firefox(fire_profile, options=self.Options)
+                    fire_profile = webdriver.FirefoxProfile(self.dir + self.cd + file)
+                    if self.platform == "windows":
+                        self.driver = webdriver.Firefox(fire_profile, options=self.Options)
+                    elif self.platform == "linux":
+                        self.driver = webdriver.Firefox(fire_profile, executable_path=(self.path + '/geckodriver'),
+                                                        options=self.Options)
                 self.Storage = {}
                 self.driver.get('https://web.whatsapp.com/')
                 for key, value in get(self.driver).items():
@@ -104,16 +133,23 @@ class WaWebSession:
                     except UnicodeEncodeError:
                         pass
                 self.pStorage[file] = self.Storage
-            self.driver.quit()
+                self.driver.quit()
             return self.pStorage
 
     def create_new(self):
         options = self.Options
         options.headless = False
         if self.choice == 1:
-            self.driver = webdriver.Chrome(options=options)
+            if self.platform == 'linux':
+                self.driver = webdriver.Chrome((self.path + '/chromedriver'), options=options)
+            else:
+                self.driver = webdriver.Chrome(options=options)
         else:
-            self.driver = webdriver.Firefox(options=options)
+            if self.platform == 'linux':
+                self.driver = webdriver.Firefox(executable_path=(self.path + '/geckodriver'),
+                                                options=options)
+            else:
+                self.driver = webdriver.Firefox(options=options)
         self.driver.get('https://web.whatsapp.com/')
         input('Please log in and press Enter...')
         for key, value in get(self.driver).items():
@@ -135,9 +171,16 @@ class WaWebSession:
         options = self.Options
         options.headless = False
         if self.choice == 1:
-            self.driver = webdriver.Chrome(options=options)
+            if self.platform == 'linux':
+                self.driver = webdriver.Chrome((self.path + '/chromedriver'), options=options)
+            else:
+                self.driver = webdriver.Chrome(options=options)
         else:
-            self.driver = webdriver.Firefox(options=options)
+            if self.platform == 'linux':
+                self.driver = webdriver.Firefox(executable_path=(self.path + '/geckodriver'),
+                                                options=options)
+            else:
+                self.driver = webdriver.Firefox(options=options)
         if file:
             with open(file, 'r') as stor:
                 lsfile = stor.readlines()
@@ -161,9 +204,16 @@ class WaWebSession:
                     raise SyntaxError
                 else:
                     if self.choice == 1:
-                        self.driver = webdriver.Chrome(chrome_options=options)
+                        if self.platform == 'linux':
+                            self.driver = webdriver.Chrome((self.path + '/chromedriver'), chrome_options=options)
+                        else:
+                            self.driver = webdriver.Chrome(chrome_options=options)
                     else:
-                        self.driver = webdriver.Firefox(options=options)
+                        if self.platform == 'linux':
+                            self.driver = webdriver.Firefox(executable_path=(self.path + '/geckodriver'),
+                                                            options=options)
+                        else:
+                            self.driver = webdriver.Firefox(options=options)
                     self.driver.get('https://web.whatsapp.com/')
                     for key in s_dict:
                         self.driver.execute_script(("window.localStorage.setItem('%s', '%s')" % (key, s_dict[key])))
@@ -192,10 +242,10 @@ class WaWebSession:
                 if str(type(session[item])) == "<class 'str'>":
                     single = True
                     if name:
-                        if os.path.isfile(path + '\\' + name + '.lwa'):
+                        if os.path.isfile(path + self.cd + name + '.lwa'):
                             print('File already exists.')
                             raise os.error
-                        with open(path + '\\' + name + '.lwa', 'a') as file:
+                        with open(path + self.cd + name + '.lwa', 'a') as file:
                             try:
                                 file.writelines(item + ' : ' + session[item])
                             except UnicodeEncodeError:
@@ -205,69 +255,69 @@ class WaWebSession:
                     single = False
                     if name:
                         if item == "":
-                            if os.path.isfile(path + '\\' + name + '.lwa'):
+                            if os.path.isfile(path + self.cd + name + '.lwa'):
                                 print('File already exists.')
                                 raise os.error
                         else:
-                            if os.path.isfile(path + '\\' + name + '-' + item + '.lwa'):
+                            if os.path.isfile(path + self.cd + name + '-' + item + '.lwa'):
                                 print('File already exists.')
                                 raise os.error
                     else:
                         if item == "":
-                            if os.path.isfile(path + '\\SessionFile.lwa'):
+                            if os.path.isfile(path + self.cd + 'SessionFile.lwa'):
                                 print('File already exists.')
                                 raise os.error
                         else:
-                            if os.path.isfile(path + '\\SessionFile-' + item + '.lwa'):
+                            if os.path.isfile(path + self.cd + 'SessionFile-' + item + '.lwa'):
                                 print('File already exists.')
                                 raise os.error
 
                     for key in session[item]:
                         if name:
                             if item == "":
-                                with open(path + '\\' + name + '.lwa', 'a') as file:
+                                with open(path + self.cd + name + '.lwa', 'a') as file:
                                     try:
                                         file.write(key + ' : ' + session[item][key] + '\n')
                                     except UnicodeEncodeError:
                                         pass
                             else:
-                                with open(path + '\\' + name + '-' + item + '.lwa', 'a') as file:
+                                with open(path + self.cd + name + '-' + item + '.lwa', 'a') as file:
                                     try:
                                         file.write(key + ' : ' + session[item][key] + '\n')
                                     except UnicodeEncodeError:
                                         pass
                         else:
                             if item == "":
-                                with open(path + '\\SessionFile.lwa', 'a') as file:
+                                with open(path + self.cd + 'SessionFile.lwa', 'a') as file:
                                     try:
                                         file.write(key + ' : ' + session[item][key] + '\n')
                                     except UnicodeEncodeError:
                                         pass
                             else:
-                                with open(path + '\\SessionFile-' + item + '.lwa', 'a') as file:
+                                with open(path + self.cd + 'SessionFile-' + item + '.lwa', 'a') as file:
                                     try:
                                         file.write(key + ' : ' + session[item][key] + '\n')
                                     except UnicodeEncodeError:
                                         pass
                     if name:
                         if item == "":
-                            print('File saved to: ' + path + '\\' + name + '.lwa')
+                            print('File saved to: ' + path + self.cd + name + '.lwa')
                         else:
-                            print('File saved to: ' + path + '\\SessionFile-' + item + '.lwa')
+                            print('File saved to: ' + path + self.cd + 'SessionFile-' + item + '.lwa')
                     else:
                         if item == "":
-                            print('File saved to: ' + path + '\\SessionFile.lwa')
+                            print('File saved to: ' + path + self.cd + 'SessionFile.lwa')
                         else:
-                            print('File saved to: ' + path + '\\SessionFile-' + item + '.lwa')
+                            print('File saved to: ' + path + self.cd + 'SessionFile-' + item + '.lwa')
                 else:
                     print("Please check your session dict. It should provide a string or dict\n"
-                          "Read: https://github.com/jeliebig/WAWebSessionHandler#session-dict-design")
+                          "Read: https://github.com/jeliebig/WAWebSessionHandler#session-dict-design\n")
                     raise SyntaxError
             if single:
                 if name:
-                    print('File saved to: ' + path + '\\' + name + '.lwa')
+                    print('File saved to: ' + path + self.cd + name + '.lwa')
                 else:
-                    print('File saved to: ' + path + '\\SessionFile.lwa')
+                    print('File saved to: ' + path + self.cd + 'SessionFile.lwa')
         else:
             print('Input should be a dict with profiles and localStorage or a dict with key and value')
             # TODO: improve Error msg
