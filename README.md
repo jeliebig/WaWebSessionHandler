@@ -13,7 +13,7 @@ You could simply run "WaWebSession.py" and use it as a script, or you could impo
 
 # Syntax:
 -  WaWebSession() -> creates a new instance of WaWebSession()
-    - you could choose a between "chrome" and "firefox" with WaWebSession(browser=)
+    - you could choose between "chrome" and "firefox" with WaWebSession(browser=)
 - WaWebSession().create_new() -> gets a session from a new browser session (login prompt)
     - returns a dict
 - WaWebSession().get_active() -> gets all the active sessions from a browser
