@@ -102,7 +102,9 @@ class WaWebSession:
 
         indexed_db = self.__get_indexed_db()
 
+        self.log.debug("Closing browser...")
         self.__driver.quit()
+
         return indexed_db
 
     def __start_session(self, options, profile_name=None, wait_for_login=True):
@@ -324,9 +326,11 @@ class WaWebSession:
         self.log.debug('Reloading WhatsApp Web...')
         self.__driver.refresh()
 
+        self.log.debug('Waiting until the browser window got closed...')
         while True:
             try:
                 _ = self.__driver.window_handles
+                time.sleep(1)
             except WebDriverException:
                 break
 
