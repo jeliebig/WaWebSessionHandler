@@ -7,15 +7,16 @@ import time
 from selenium import webdriver
 from selenium.common.exceptions import WebDriverException
 
+CHROME = 1
+FIREFOX = 2
 
-class WaWebSession:
+
+class SessionHandler:
     __URL = 'https://web.whatsapp.com/'
-    CHROME = 1
-    FIREFOX = 2
 
     def __init_browser(self):
         self.log.debug("Setting browser user dirs...")
-        if self.__browser_choice == self.CHROME:
+        if self.__browser_choice == CHROME:
             self.__browser_options = webdriver.ChromeOptions()
 
             if self.__platform == 'windows':
@@ -24,7 +25,7 @@ class WaWebSession:
             elif self.__platform == 'linux':
                 self.__browser_user_dir = os.path.join(os.environ['HOME'], '.config', 'google-chrome')
 
-        elif self.__browser_choice == self.FIREFOX:
+        elif self.__browser_choice == FIREFOX:
             self.__browser_options = webdriver.FirefoxOptions()
 
             if self.__platform == 'windows':
@@ -40,13 +41,13 @@ class WaWebSession:
 
     def __refresh_profile_list(self):
         self.log.debug('Getting browser profiles...')
-        if self.__browser_choice == self.CHROME:
+        if self.__browser_choice == CHROME:
             self.__browser_profile_list = ['']
             for profile_dir in os.listdir(self.__browser_user_dir):
                 if 'profile' in profile_dir.lower():
                     if profile_dir != 'System Profile':
                         self.__browser_profile_list.append(profile_dir)
-        elif self.__browser_choice == self.FIREFOX:
+        elif self.__browser_choice == FIREFOX:
             # TODO: consider reading out the profiles.ini
             self.__browser_profile_list = []
             for profile_dir in os.listdir(self.__browser_user_dir):
@@ -110,9 +111,9 @@ class WaWebSession:
     def __start_session(self, options, profile_name=None, wait_for_login=True):
         self.log.debug('Starting browser... [HEADLESS: %s]', str(options.headless))
         if profile_name is None:
-            if self.__browser_choice == self.CHROME:
+            if self.__browser_choice == CHROME:
                 self.__driver = webdriver.Chrome(options=options)
-            elif self.__browser_choice == self.FIREFOX:
+            elif self.__browser_choice == FIREFOX:
                 self.__driver = webdriver.Firefox(options=options)
 
             self.log.debug('Loading WhatsApp Web...')
@@ -130,10 +131,10 @@ class WaWebSession:
                             break
                 self.log.debug('Login completed.')
         else:
-            if self.__browser_choice == self.CHROME:
+            if self.__browser_choice == CHROME:
                 options.add_argument('user-data-dir=%s' % os.path.join(self.__browser_user_dir, profile_name))
                 self.__driver = webdriver.Chrome(options=options)
-            elif self.__browser_choice == self.FIREFOX:
+            elif self.__browser_choice == FIREFOX:
                 fire_profile = webdriver.FirefoxProfile(os.path.join(self.__browser_user_dir, profile_name))
                 self.__driver = webdriver.Firefox(fire_profile, options=options)
 
@@ -158,7 +159,7 @@ class WaWebSession:
         self.__start_session(self.__browser_options, profile_name)
 
     def __init__(self, browser=None, log_level=None):
-        self.log = logging.getLogger('WaWebSession')
+        self.log = logging.getLogger('WaWebSession:SessionHandler')
         log_format = logging.Formatter('%(asctime)s [%(levelname)s] (%(funcName)s): %(message)s')
 
         log_stream = logging.StreamHandler()
@@ -191,9 +192,9 @@ class WaWebSession:
                       '2) Firefox\n')
                 input_browser_choice = int(input('Select a browser by choosing a number from the list: '))
             if input_browser_choice == 1:
-                self.set_browser(self.CHROME)
+                self.set_browser(CHROME)
             elif input_browser_choice == 2:
-                self.set_browser(self.FIREFOX)
+                self.set_browser(FIREFOX)
 
         self.__init_browser()
 
@@ -231,16 +232,16 @@ class WaWebSession:
         if type(browser) == str:
             if browser.lower() == 'chrome':
                 self.log.debug('Setting browser... [TYPE: %s]', 'Chrome')
-                self.__browser_choice = self.CHROME
+                self.__browser_choice = CHROME
             elif browser.lower() == 'firefox':
                 self.log.debug('Setting browser... [TYPE: %s]', 'Firefox')
-                self.__browser_choice = self.FIREFOX
+                self.__browser_choice = FIREFOX
             else:
                 raise ValueError('The specified browser is invalid. Try to use "chrome" or "firefox" instead.')
         else:
-            if browser == self.CHROME:
+            if browser == CHROME:
                 self.log.debug('Setting browser... [TYPE: %s]', 'Chrome')
-            elif browser == self.FIREFOX:
+            elif browser == FIREFOX:
                 self.log.debug('Setting browser... [TYPE: %s]', 'Firefox')
             else:
                 raise ValueError(
@@ -392,7 +393,7 @@ class WaWebSession:
 
 
 if __name__ == '__main__':
-    web = WaWebSession()
+    web = SessionHandler()
     web.set_log_level(logging.DEBUG)
     choice = 0
     while choice != 1 and choice != 2:
