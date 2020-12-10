@@ -261,8 +261,10 @@ class SessionHandler:
             return self.__get_profile_storage()
         elif use_profile and use_profile in self.__browser_profile_list:
             use_profile_list.append(use_profile)
-        else:
+        elif type(use_profile) == list:
             use_profile_list.extend(self.__browser_profile_list)
+        else:
+            raise ValueError("Invalid profile provided. Make sure you provided a list of profiles or a profile name.")
 
         for profile in use_profile_list:
             profile_storage_dict[profile] = self.__get_profile_storage(profile)
@@ -272,7 +274,7 @@ class SessionHandler:
     def create_new_session(self):
         return self.__get_profile_storage()
 
-    def access_by_dict(self, wa_profile_list):
+    def access_by_obj(self, wa_profile_list):
         verified_wa_profile_list = False
         for object_store_obj in wa_profile_list:
             if 'WASecretBundle' in object_store_obj['key']:
@@ -351,7 +353,7 @@ class SessionHandler:
                     break
             if verified_wa_profile_list:
                 self.log.debug('WaSession object is valid.')
-                self.access_by_dict(wa_profile_list)
+                self.access_by_obj(wa_profile_list)
             else:
                 raise ValueError('There might be multiple profiles stored in this file.'
                                  ' Make sure you only pass one WaSession file to this method.')
@@ -363,9 +365,10 @@ class SessionHandler:
 
         verified_wa_profile_list = False
         for object_store_obj in wa_profile_list:
-            if 'WASecretBundle' in object_store_obj['key']:
-                verified_wa_profile_list = True
-                break
+            if 'key' in object_store_obj:
+                if 'WASecretBundle' in object_store_obj['key']:
+                    verified_wa_profile_list = True
+                    break
         if verified_wa_profile_list:
             self.log.debug('Saving WaSession object to file...')
             with open(file_path, 'w') as file:
@@ -377,9 +380,10 @@ class SessionHandler:
                 profile_storage = wa_profile_list[profile_name]
                 verified_wa_profile_list = False
                 for object_store_obj in profile_storage:
-                    if 'WASecretBundle' in object_store_obj['key']:
-                        verified_wa_profile_list = True
-                        break
+                    if 'key' in object_store_obj:
+                        if 'WASecretBundle' in object_store_obj['key']:
+                            verified_wa_profile_list = True
+                            break
                 if verified_wa_profile_list:
                     self.log.debug('Found a new profile in the list!')
                     single_profile_name = os.path.basename(file_path) + '-' + profile_name
