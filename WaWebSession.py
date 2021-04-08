@@ -14,6 +14,31 @@ FIREFOX = 2
 class SessionHandler:
     __URL = 'https://web.whatsapp.com/'
 
+    @staticmethod
+    def verify_profile_object(profile_obj: list):
+        for entry in profile_obj:
+            if 'key' in entry and 'WASecretBundle' in entry['key']:
+                return True
+        return False
+
+    def __refresh_profile_list(self):
+        self.log.debug('Getting browser profiles...')
+        if self.__browser_choice == CHROME:
+            self.__browser_profile_list = ['']
+            for profile_dir in os.listdir(self.__browser_user_dir):
+                if 'profile' in profile_dir.lower():
+                    if profile_dir != 'System Profile':
+                        self.__browser_profile_list.append(profile_dir)
+        elif self.__browser_choice == FIREFOX:
+            # TODO: consider reading out the profiles.ini
+            self.__browser_profile_list = []
+            for profile_dir in os.listdir(self.__browser_user_dir):
+                if not profile_dir.endswith('.default'):
+                    if os.path.isdir(os.path.join(self.__browser_user_dir, profile_dir)):
+                        self.__browser_profile_list.append(profile_dir)
+
+        self.log.debug('Browser profiles registered.')
+
     def __init_browser(self):
         self.log.debug("Setting browser user dirs...")
         if self.__browser_choice == CHROME:
@@ -39,24 +64,6 @@ class SessionHandler:
         self.__browser_options.headless = True
         self.__refresh_profile_list()
 
-    def __refresh_profile_list(self):
-        self.log.debug('Getting browser profiles...')
-        if self.__browser_choice == CHROME:
-            self.__browser_profile_list = ['']
-            for profile_dir in os.listdir(self.__browser_user_dir):
-                if 'profile' in profile_dir.lower():
-                    if profile_dir != 'System Profile':
-                        self.__browser_profile_list.append(profile_dir)
-        elif self.__browser_choice == FIREFOX:
-            # TODO: consider reading out the profiles.ini
-            self.__browser_profile_list = []
-            for profile_dir in os.listdir(self.__browser_user_dir):
-                if not profile_dir.endswith('.default'):
-                    if os.path.isdir(os.path.join(self.__browser_user_dir, profile_dir)):
-                        self.__browser_profile_list.append(profile_dir)
-
-        self.log.debug('Browser profiles registered.')
-
     def __get_indexed_db(self):
         self.log.debug('Executing getIDBObjects function...')
         self.__driver.execute_script('window.waScript = {};'
@@ -78,35 +85,15 @@ class SessionHandler:
                                      'window.waScript.getAllRequest = window.waScript.objectStore.getAll();'
                                      'window.waScript.getAllRequest.onsuccess = function(getAllEvent) {'
                                      'window.waScript.waSession = getAllEvent.target.result;'
-                                     '};'
-                                     '};'
-                                     '}'
+                                     '};};}'
                                      'getAllObjects();')
         self.log.debug('Waiting until IDB operation finished...')
         while not self.__driver.execute_script('return window.waScript.waSession != undefined;'):
             time.sleep(1)
         self.log.debug('Getting IDB results...')
-        wa_session_list = self.__driver.execute_script('return window.waScript.waSession;')
-        self.log.debug('Got IDB data: %s', wa_session_list)
-        return wa_session_list
-
-    def __get_profile_storage(self, profile_name=None):
-        self.__refresh_profile_list()
-
-        if profile_name is not None and profile_name not in self.__browser_profile_list:
-            raise ValueError('The specified profile_name was not found. Make sure the name is correct.')
-
-        if profile_name is None:
-            self.__start_visible_session()
-        else:
-            self.__start_invisible_session(profile_name)
-
-        indexed_db = self.__get_indexed_db()
-
-        self.log.debug("Closing browser...")
-        self.__driver.quit()
-
-        return indexed_db
+        wa_session_obj: list = self.__driver.execute_script('return window.waScript.waSession;')
+        self.log.debug('Got IDB data: %s', wa_session_obj)
+        return wa_session_obj
 
     def __start_session(self, options, profile_name=None, wait_for_login=True):
         self.log.debug('Starting browser... [HEADLESS: %s]', str(options.headless))
@@ -121,14 +108,8 @@ class SessionHandler:
 
             if wait_for_login:
                 self.log.debug('Waiting for login...')
-                verified_wa_profile_list = False
-                while not verified_wa_profile_list:
+                while not self.verify_profile_object(self.__get_indexed_db()):
                     time.sleep(1)
-                    verified_wa_profile_list = False
-                    for object_store_obj in self.__get_indexed_db():
-                        if 'WASecretBundle' in object_store_obj['key']:
-                            verified_wa_profile_list = True
-                            break
                 self.log.debug('Login completed.')
         else:
             if self.__browser_choice == CHROME:
@@ -141,22 +122,40 @@ class SessionHandler:
             self.log.debug('Loading WhatsApp Web...')
             self.__driver.get(self.__URL)
 
+    def __verify_profile_name_exists(self, profile_name: str):
+        self.__refresh_profile_list()
+        if profile_name is not str:
+            raise TypeError('The provided profile_name is not a string.')
+        if profile_name not in self.__browser_profile_list:
+            raise ValueError('The provided profile_name was not found. Make sure the name is correct.')
+        else:
+            return True
+
     def __start_visible_session(self, profile_name=None, wait_for_login=True):
         options = self.__browser_options
         options.headless = False
-        self.__refresh_profile_list()
 
-        if profile_name is not None and profile_name not in self.__browser_profile_list:
-            raise ValueError('The specified profile_name was not found. Make sure the name is correct.')
-
+        self.__verify_profile_name_exists(profile_name)
         self.__start_session(options, profile_name, wait_for_login)
 
     def __start_invisible_session(self, profile_name=None):
-        self.__refresh_profile_list()
-        if profile_name is not None and profile_name not in self.__browser_profile_list:
-            raise ValueError('The specified profile_name was not found. Make sure the name is correct.')
+        self.__verify_profile_name_exists(profile_name)
 
         self.__start_session(self.__browser_options, profile_name)
+
+    def __get_profile_storage(self, profile_name=None):
+        if profile_name is None:
+            self.__start_visible_session()
+        else:
+            self.__verify_profile_name_exists(profile_name)
+            self.__start_invisible_session(profile_name)
+
+        indexed_db = self.__get_indexed_db()
+
+        self.log.debug("Closing browser...")
+        self.__driver.quit()
+
+        return indexed_db
 
     def __init__(self, browser=None, log_level=None):
         self.log = logging.getLogger('WaWebSession:SessionHandler')
@@ -222,6 +221,7 @@ class SessionHandler:
             if new_log_level in possible_level_values:
                 self.__log_level = new_log_level
             else:
+                # NOTE: Could also be a TypeError
                 raise ValueError(
                     'You can only pass a logging level or one of the following string to this function: %s',
                     str(possible_level_strings))
@@ -244,8 +244,9 @@ class SessionHandler:
             elif browser == FIREFOX:
                 self.log.debug('Setting browser... [TYPE: %s]', 'Firefox')
             else:
-                raise ValueError(
-                    'Browser type invalid. Try to use WaWebSession.CHROME or WaWebSession.FIREFOX instead.')
+                raise TypeError(
+                    'Browser type invalid. Try to use WaWebSession.CHROME or WaWebSession.FIREFOX instead.'
+                )
 
             self.__browser_choice = browser
 
@@ -264,6 +265,7 @@ class SessionHandler:
         elif type(use_profile) == list:
             use_profile_list.extend(self.__browser_profile_list)
         else:
+            # NOTE: Should this be a TypeError instead?
             raise ValueError("Invalid profile provided. Make sure you provided a list of profiles or a profile name.")
 
         for profile in use_profile_list:
@@ -274,15 +276,12 @@ class SessionHandler:
     def create_new_session(self):
         return self.__get_profile_storage()
 
-    def access_by_obj(self, wa_profile_list):
-        verified_wa_profile_list = False
-        for object_store_obj in wa_profile_list:
-            if 'WASecretBundle' in object_store_obj['key']:
-                verified_wa_profile_list = True
-                break
-
-        if not verified_wa_profile_list:
-            raise ValueError('This is not a valid profile list. Make sure you only pass one session to this method.')
+    def access_by_obj(self, wa_profile_obj):
+        if not self.verify_profile_object(wa_profile_obj):
+            raise TypeError(
+                'Invalid profile list provided. '
+                'Make sure you only pass one session to this method.'
+            )
 
         self.__start_visible_session(wait_for_login=False)
         self.log.debug('Inserting setIDBObjects function...')
@@ -318,10 +317,11 @@ class SessionHandler:
                                      '};'
                                      '}')
         self.log.debug('setIDBObjects function inserted.')
-        self.log.debug('Writing IDB data: %s', wa_profile_list)
-        self.__driver.execute_script('window.waScript.setAllObjects(arguments[0]);', wa_profile_list)
+        self.log.debug('Writing IDB data: %s', wa_profile_obj)
+        self.__driver.execute_script('window.waScript.setAllObjects(arguments[0]);', wa_profile_obj)
 
         self.log.debug('Waiting until all objects are written to IDB...')
+        # FIXME: This looks awful. Please find a way to make this look a little better.
         while not self.__driver.execute_script(
                 'return (window.waScript.insertDone == window.waScript.jsonObj.length);'):
             time.sleep(1)
@@ -329,7 +329,7 @@ class SessionHandler:
         self.log.debug('Reloading WhatsApp Web...')
         self.__driver.refresh()
 
-        self.log.debug('Waiting until the browser window got closed...')
+        self.log.debug('Waiting until the browser window is closed...')
         while True:
             try:
                 _ = self.__driver.window_handles
@@ -343,57 +343,44 @@ class SessionHandler:
         if os.path.isfile(profile_file):
             self.log.debug('Reading WaSession from file...')
             with open(profile_file, 'r') as file:
-                wa_profile_list = json.load(file)
+                wa_profile_obj = json.load(file)
 
             self.log.debug('Verifying WaSession object...')
-            verified_wa_profile_list = False
-            for object_store_obj in wa_profile_list:
-                if 'WASecretBundle' in object_store_obj['key']:
-                    verified_wa_profile_list = True
-                    break
-            if verified_wa_profile_list:
-                self.log.debug('WaSession object is valid.')
-                self.access_by_obj(wa_profile_list)
-            else:
-                raise ValueError('There might be multiple profiles stored in this file.'
-                                 ' Make sure you only pass one WaSession file to this method.')
+            if not self.verify_profile_object(wa_profile_obj):
+                raise TypeError(
+                    'There might be multiple profiles stored in this file. '
+                    'Make sure you only pass one WaSession file to this method.'
+                )
+
+            self.log.debug('WaSession object is valid.')
+            self.access_by_obj(wa_profile_obj)
+
         else:
             raise FileNotFoundError('Make sure you pass a valid WaSession file to this method.')
 
-    def save_profile(self, wa_profile_list, file_path):
+    def save_profile(self, wa_profile_obj, file_path):
         file_path = os.path.normpath(file_path)
 
-        verified_wa_profile_list = False
-        for object_store_obj in wa_profile_list:
-            if 'key' in object_store_obj:
-                if 'WASecretBundle' in object_store_obj['key']:
-                    verified_wa_profile_list = True
-                    break
-        if verified_wa_profile_list:
+        if self.verify_profile_object(wa_profile_obj):
             self.log.debug('Saving WaSession object to file...')
             with open(file_path, 'w') as file:
-                json.dump(wa_profile_list, file, indent=4)
+                json.dump(wa_profile_obj, file, indent=4)
         else:
             self.log.debug('Scanning the list for multiple WaSession objects...')
             saved_profiles = 0
-            for profile_name in wa_profile_list.keys():
-                profile_storage = wa_profile_list[profile_name]
-                verified_wa_profile_list = False
-                for object_store_obj in profile_storage:
-                    if 'key' in object_store_obj:
-                        if 'WASecretBundle' in object_store_obj['key']:
-                            verified_wa_profile_list = True
-                            break
-                if verified_wa_profile_list:
+            for profile_name in wa_profile_obj.keys():
+                profile_storage = wa_profile_obj[profile_name]
+                if self.verify_profile_object(profile_storage):
                     self.log.debug('Found a new profile in the list!')
                     single_profile_name = os.path.basename(file_path) + '-' + profile_name
                     self.save_profile(profile_storage, os.path.join(os.path.dirname(file_path), single_profile_name))
                     saved_profiles += 1
             if saved_profiles > 0:
-                self.log.debug('Saved %s profile objects as files.')
+                self.log.debug('Saved %s profile objects as files.', saved_profiles)
             else:
                 raise ValueError(
-                    'Could not find any profiles in the list. Make sure to specified file path is correct.')
+                    'Could not find any profiles in the list. Make sure to specified file path is correct.'
+                )
 
 
 if __name__ == '__main__':
