@@ -36,6 +36,20 @@ class SessionHandler:
                 return True
         return False
 
+    @staticmethod
+    def convert_ls_to_idb_obj(ls_obj: dict[str, str]) -> list[dict[str, str]]:
+        idb_list = []
+        for ls_key, ls_val in ls_obj:
+            idb_list.append({'key': ls_key, 'value': ls_val})
+        return idb_list
+
+    @staticmethod
+    def convert_idb_to_ls_obj(idb_obj: list[dict[str, str]]) -> dict[str, str]:
+        ls_dict = {}
+        for idb_entry in idb_obj:
+            ls_dict[idb_entry['key']] = idb_entry['value']
+        return ls_dict
+
     def __refresh_profile_list(self) -> NoReturn:
         self.log.debug('Getting browser profiles...')
         if self.__browser_choice == Browser.CHROME:
@@ -79,29 +93,47 @@ class SessionHandler:
         self.__browser_options.headless = True
         self.__refresh_profile_list()
 
+    def __get_local_storage(self) -> dict[str, str]:
+        self.log.debug('Executing getLS function...')
+        return self.__driver.execute_script('''
+        var waSession = {};
+        waLs = window.localStorage;
+        for (int i = 0; i < waLs.length; i++) {
+            waSession[waLs.key(i)] = waLs.getItem(waLs.key(i));
+        }
+        return waSession;
+        ''')
+
+    def __set_local_storage(self, wa_session_obj: dict[str, str]) -> NoReturn:
+        for ls_key, ls_val in wa_session_obj.items():
+            self.__driver.execute_script('window.localStorage.setItem(arguments[0], arguments[1]);',
+                                         ls_key, ls_val)
+
     def __get_indexed_db_user(self) -> list[dict[str, str]]:
         self.log.debug('Executing getIDBObjects function...')
-        self.__driver.execute_script('window.waScript = {};'
-                                     'window.waScript.waSession = undefined;'
-                                     'function getAllObjects() {'
-                                     'window.waScript.dbName = "wawc";'
-                                     'window.waScript.osName = "user";'
-                                     'window.waScript.db = undefined;'
-                                     'window.waScript.transaction = undefined;'
-                                     'window.waScript.objectStore = undefined;'
-                                     'window.waScript.getAllRequest = undefined;'
-                                     'window.waScript.request = indexedDB.open(window.waScript.dbName);'
-                                     'window.waScript.request.onsuccess = function(event) {'
-                                     'window.waScript.db = event.target.result;'
-                                     'window.waScript.transaction = window.waScript.db.transaction('
-                                     'window.waScript.osName);'
-                                     'window.waScript.objectStore = window.waScript.transaction.objectStore('
-                                     'window.waScript.osName);'
-                                     'window.waScript.getAllRequest = window.waScript.objectStore.getAll();'
-                                     'window.waScript.getAllRequest.onsuccess = function(getAllEvent) {'
-                                     'window.waScript.waSession = getAllEvent.target.result;'
-                                     '};};}'
-                                     'getAllObjects();')
+        self.__driver.execute_script('''
+        window.waScript = {};
+        window.waScript.waSession = undefined;
+        function getAllObjects() {
+            window.waScript.dbName = "wawc";
+            window.waScript.osName = "user";
+            window.waScript.db = undefined;
+            window.waScript.transaction = undefined;
+            window.waScript.objectStore = undefined;
+            window.waScript.getAllRequest = undefined;
+            window.waScript.request = indexedDB.open(window.waScript.dbName);
+            window.waScript.request.onsuccess = function(event) {
+                window.waScript.db = event.target.result;
+                window.waScript.transaction = window.waScript.db.transaction(window.waScript.osName);
+                window.waScript.objectStore = window.waScript.transaction.objectStore(window.waScript.osName);
+                window.waScript.getAllRequest = window.waScript.objectStore.getAll();
+                window.waScript.getAllRequest.onsuccess = function(getAllEvent) {
+                    window.waScript.waSession = getAllEvent.target.result;
+                };
+            };
+        }
+        getAllObjects();
+        ''')
         self.log.debug('Waiting until IDB operation finished...')
         while not self.__driver.execute_script('return window.waScript.waSession != undefined;'):
             time.sleep(1)
@@ -113,37 +145,36 @@ class SessionHandler:
     def __set_indexed_db_user(self, wa_session_obj: list[dict[str, str]]) -> NoReturn:
         self.log.debug('Inserting setIDBObjects function...')
         # TODO: If I support loading multiple sessions in one browser window I only need to execute this once.
-        self.__driver.execute_script('window.waScript = {};'
-                                     'window.waScript.insertDone = 0;'
-                                     'window.waScript.jsonObj = undefined;'
-                                     'window.waScript.setAllObjects = function (_jsonObj) {'
-                                     'window.waScript.jsonObj = _jsonObj;'
-                                     'window.waScript.dbName = "wawc";'
-                                     'window.waScript.osName = "user";'
-                                     'window.waScript.db;'
-                                     'window.waScript.transaction;'
-                                     'window.waScript.objectStore;'
-                                     'window.waScript.clearRequest;'
-                                     'window.waScript.addRequest;'
-                                     'window.waScript.request = indexedDB.open(window.waScript.dbName);'
-                                     'window.waScript.request.onsuccess = function(event) {'
-                                     'window.waScript.db = event.target.result;'
-                                     'window.waScript.transaction = window.waScript.db.transaction('
-                                     'window.waScript.osName, "readwrite");'
-                                     'window.waScript.objectStore = window.waScript.transaction.objectStore('
-                                     'window.waScript.osName);'
-                                     'window.waScript.clearRequest = window.waScript.objectStore.clear();'
-                                     'window.waScript.clearRequest.onsuccess = function(clearEvent) {'
-                                     'for (var i=0; i<window.waScript.jsonObj.length; i++) {'
-                                     'window.waScript.addRequest = window.waScript.objectStore.add('
-                                     'window.waScript.jsonObj[i]);'
-                                     'window.waScript.addRequest.onsuccess = function(addEvent) {'
-                                     'window.waScript.insertDone++;'
-                                     '};'
-                                     '}'
-                                     '};'
-                                     '};'
-                                     '}')
+        self.__driver.execute_script('''
+        window.waScript = {};
+        window.waScript.insertDone = 0;
+        window.waScript.jsonObj = undefined;
+        window.waScript.setAllObjects = function (_jsonObj) {
+            window.waScript.jsonObj = _jsonObj;
+            window.waScript.dbName = "wawc";
+            window.waScript.osName = "user";
+            window.waScript.db;
+            window.waScript.transaction;
+            window.waScript.objectStore;
+            window.waScript.clearRequest;
+            window.waScript.addRequest;
+            window.waScript.request = indexedDB.open(window.waScript.dbName);
+            window.waScript.request.onsuccess = function(event) {
+                window.waScript.db = event.target.result;
+                window.waScript.transaction = window.waScript.db.transaction(window.waScript.osName, "readwrite");
+                window.waScript.objectStore = window.waScript.transaction.objectStore(window.waScript.osName);
+                window.waScript.clearRequest = window.waScript.objectStore.clear();
+                window.waScript.clearRequest.onsuccess = function(clearEvent) {
+                    for (var i=0; i<window.waScript.jsonObj.length; i++) {
+                        window.waScript.addRequest = window.waScript.objectStore.add(window.waScript.jsonObj[i]);
+                        window.waScript.addRequest.onsuccess = function(addEvent) {
+                            window.waScript.insertDone++;
+                        };
+                    }
+                };
+            };
+        }
+        ''')
         self.log.debug('setIDBObjects function inserted.')
 
         self.log.debug('Writing IDB data: %s', wa_session_obj)
@@ -204,9 +235,6 @@ class SessionHandler:
         self.__verify_profile_name_exists(profile_name)
 
         self.__start_session(self.__browser_options, profile_name)
-
-    def __is_logged_in(self) -> bool:
-        return len(self.__driver.find_elements_by_css_selector("input[type=checkbox]")) == 0
 
     def __get_profile_storage(self, profile_name: Optional[str] = None) -> list[dict[str, str]]:
         if profile_name is None:
@@ -342,13 +370,14 @@ class SessionHandler:
     def access_by_obj(self, wa_profile_obj: list[dict[str, str]]) -> NoReturn:
         if not self.verify_profile_object(wa_profile_obj):
             raise TypeError(
-                'Invalid profile list provided. '
+                'Invalid profile object provided. '
                 'Make sure you only pass one session to this method.'
             )
 
         self.__start_visible_session(wait_for_login=False)
 
         self.__set_indexed_db_user(wa_profile_obj)
+        self.__set_local_storage(self.convert_idb_to_ls_obj(wa_profile_obj))
         self.log.debug('Reloading WhatsApp Web...')
         self.__driver.refresh()
 
