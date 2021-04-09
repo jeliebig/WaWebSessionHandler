@@ -139,7 +139,7 @@ class SessionHandler:
             time.sleep(1)
         self.log.debug('Getting IDB results...')
         wa_session_obj: list[dict[str, str]] = self.__driver.execute_script('return window.waScript.waSession;')
-        self.log.debug('Got IDB data: %s', wa_session_obj)
+        # self.log.debug('Got IDB data: %s', wa_session_obj)
         return wa_session_obj
 
     def __set_indexed_db_user(self, wa_session_obj: list[dict[str, str]]) -> NoReturn:
@@ -177,7 +177,8 @@ class SessionHandler:
         ''')
         self.log.debug('setIDBObjects function inserted.')
 
-        self.log.debug('Writing IDB data: %s', wa_session_obj)
+        # self.log.debug('Writing IDB data: %s', wa_session_obj)
+        self.log.debug('Writing IDB data...')
         self.__driver.execute_script('window.waScript.setAllObjects(arguments[0]);', wa_session_obj)
 
         self.log.debug('Waiting until all objects are written to IDB...')
@@ -189,7 +190,7 @@ class SessionHandler:
     def __verify_profile_name_exists(self, profile_name: str) -> bool:
         self.__refresh_profile_list()
         # NOTE: Is this still required?
-        if profile_name is not str:
+        if not isinstance(profile_name, str):
             raise TypeError('The provided profile_name is not a string.')
         if profile_name not in self.__browser_profile_list:
             raise ValueError('The provided profile_name was not found. Make sure the name is correct.')
@@ -228,12 +229,12 @@ class SessionHandler:
         options = self.__browser_options
         options.headless = False
 
-        self.__verify_profile_name_exists(profile_name)
+        if profile_name is not None:
+            self.__verify_profile_name_exists(profile_name)
         self.__start_session(options, profile_name, wait_for_login)
 
     def __start_invisible_session(self, profile_name: Optional[str] = None) -> NoReturn:
         self.__verify_profile_name_exists(profile_name)
-
         self.__start_session(self.__browser_options, profile_name)
 
     def __get_profile_storage(self, profile_name: Optional[str] = None) -> list[dict[str, str]]:
@@ -289,7 +290,7 @@ class SessionHandler:
         possible_level_strings = ['debug', 'info', 'warning', 'error', 'critical']
         possible_level_values = [logging.DEBUG, logging.INFO, logging.WARNING, logging.ERROR, logging.CRITICAL]
 
-        if new_log_level is str:
+        if isinstance(new_log_level, str):
             new_log_level = new_log_level.lower()
             if new_log_level in possible_level_strings:
                 if new_log_level == possible_level_strings[0]:
@@ -317,7 +318,7 @@ class SessionHandler:
         self.log.setLevel(self.__log_level)
 
     def set_browser(self, browser: Union[Browser, str]) -> NoReturn:
-        if browser is str:
+        if isinstance(browser, str):
             if browser.lower() == 'chrome':
                 self.log.debug('Setting browser... [TYPE: %s]', 'Chrome')
                 self.__browser_choice = Browser.CHROME
@@ -326,7 +327,7 @@ class SessionHandler:
                 self.__browser_choice = Browser.FIREFOX
             else:
                 raise ValueError('The specified browser is invalid. Try to use "chrome" or "firefox" instead.')
-        elif browser is Browser:
+        elif isinstance(browser, Browser):
             if browser == Browser.CHROME:
                 self.log.debug('Setting browser... [TYPE: %s]', 'Chrome')
             elif browser == Browser.FIREFOX:
@@ -353,7 +354,7 @@ class SessionHandler:
             return self.__get_profile_storage()
         elif use_profile and use_profile in self.__browser_profile_list:
             use_profile_list.append(use_profile)
-        elif use_profile is list:
+        elif isinstance(use_profile, list):
             use_profile_list.extend(self.__browser_profile_list)
         else:
             # NOTE: Should this be a TypeError instead?
