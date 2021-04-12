@@ -450,14 +450,18 @@ if __name__ == '__main__':
     web = SessionHandler()
     web.set_log_level(logging.DEBUG)
     choice = 0
-    while choice != 1 and choice != 2:
-        print('1) Save session to file\n'
-              '2) View session from a file\n')
+    while choice != 1 and choice != 2 and choice != 3:
+        print('1) Save a new session as a file\n'
+              '2) Save all active sessions for the selected browser to files\n'
+              '3) Open a session from a file\n')
         choice = int(input('Select an option from the list: '))
 
     if choice == 1:
-        # TODO: consider adding another option to dump all active sessions for the selected browser type
-        web.save_profile(web.get_active_session(), input('Enter a file path for the generated file: '))
-        print('File saved.')
+        web.save_profile(web.get_active_session(), input('Enter a file path for the created session file: '))
+        print('File successfully created.')
     elif choice == 2:
-        web.access_by_file(input('Enter a file path: '))
+        web.save_profile(web.get_active_session(all_profiles=True),
+                         input('Enter a file path for the created session files: '))
+        print('Files successfully created.')
+    elif choice == 3:
+        web.access_by_file(input('Enter the file path to the session file you would like to open: '))
