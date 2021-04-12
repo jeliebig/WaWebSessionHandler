@@ -340,7 +340,7 @@ class SessionHandler:
             )
 
     # TODO: Think about type aliasing
-    def get_active_session(self, use_profile: Optional[Union[list[str], str]] = None) -> Union[
+    def get_active_session(self, use_profile: Optional[Union[list[str], str]] = None, all_profiles=False) -> Union[
         list[dict[str, str]], dict[str, list[dict[str, str]]]
     ]:
         self.log.warning('Make sure the specified browser profile is not being used by another process.')
@@ -348,17 +348,25 @@ class SessionHandler:
         use_profile_list = []
         self.__refresh_profile_list()
 
-        if use_profile and use_profile not in self.__browser_profile_list:
-            raise ValueError('Profile does not exist: %s', use_profile)
-        elif use_profile is None:
-            return self.__get_profile_storage()
-        elif use_profile and use_profile in self.__browser_profile_list:
-            use_profile_list.append(use_profile)
-        elif isinstance(use_profile, list):
+        if all_profiles:
             use_profile_list.extend(self.__browser_profile_list)
+            self.log.info(
+                "Trying to get active sessions for all browser profiles of the selected type..."
+            )
         else:
-            # NOTE: Should this be a TypeError instead?
-            raise ValueError("Invalid profile provided. Make sure you provided a list of profiles or a profile name.")
+            if use_profile and use_profile not in self.__browser_profile_list:
+                raise ValueError('Profile does not exist: %s', use_profile)
+            elif use_profile is None:
+                return self.__get_profile_storage()
+            elif use_profile and use_profile in self.__browser_profile_list:
+                use_profile_list.append(use_profile)
+            elif isinstance(use_profile, list):
+                use_profile_list.extend(use_profile)
+            else:
+                # NOTE: Should this be a TypeError instead?
+                raise ValueError(
+                    "Invalid profile provided. Make sure you provided a list of profiles or a profile name."
+                )
 
         for profile in use_profile_list:
             profile_storage_dict[profile] = self.__get_profile_storage(profile)
@@ -448,6 +456,7 @@ if __name__ == '__main__':
         choice = int(input('Select an option from the list: '))
 
     if choice == 1:
+        # TODO: consider adding another option to dump all active sessions for the selected browser type
         web.save_profile(web.get_active_session(), input('Enter a file path for the generated file: '))
         print('File saved.')
     elif choice == 2:
