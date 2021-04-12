@@ -30,10 +30,16 @@ class SessionHandler:
     log: logging.Logger
 
     @staticmethod
-    def verify_profile_object(profile_obj: list[dict[str, str]]) -> bool:
+    def verify_profile_object(profile_obj: Union[list[dict[str, str]], list[str]]) -> bool:
         for entry in profile_obj:
-            if 'key' in entry.keys() and 'WASecretBundle' in entry['key']:
-                return True
+            if isinstance(entry, str):
+                if 'WASecretBundle' in entry:
+                    return True
+            elif isinstance(entry, dict):
+                if 'key' in entry.keys() and 'WASecretBundle' in entry['key']:
+                    return True
+            else:
+                raise TypeError
         return False
 
     @staticmethod
@@ -188,7 +194,7 @@ class SessionHandler:
             time.sleep(1)
 
     def __verify_profile_name_exists(self, profile_name: str) -> bool:
-        self.__refresh_profile_list()
+        # self.__refresh_profile_list()
         # NOTE: Is this still required?
         if not isinstance(profile_name, str):
             raise TypeError('The provided profile_name is not a string.')
@@ -429,6 +435,11 @@ class SessionHandler:
                 json.dump(wa_profile_obj, file, indent=2)
         else:
             self.log.debug('Scanning the list for multiple WaSession objects...')
+            if len(wa_profile_obj) == 0:
+                raise ValueError(
+                    'Could not find any profiles in the list. Make sure to specified file path is correct.'
+                )
+
             saved_profiles = 0
             for profile_name in wa_profile_obj.keys():
                 profile_storage = wa_profile_obj[profile_name]
@@ -438,12 +449,13 @@ class SessionHandler:
                     self.save_profile(profile_storage, os.path.join(os.path.dirname(file_path), single_profile_name))
                     saved_profiles += 1
             if saved_profiles > 0:
-                self.log.debug('Saved %s profile objects as files.', saved_profiles)
-                return saved_profiles
+                if saved_profiles > 1:
+                    self.log.debug('Saved %s profile objects as files.', saved_profiles)
+                else:
+                    self.log.debug('Saved %s profile object as file.', saved_profiles)
             else:
-                raise ValueError(
-                    'Could not find any profiles in the list. Make sure to specified file path is correct.'
-                )
+                self.log.error("Could not find any active profiles in the list.")
+            return saved_profiles
 
 
 if __name__ == '__main__':
@@ -460,8 +472,10 @@ if __name__ == '__main__':
         web.save_profile(web.get_active_session(), input('Enter a file path for the created session file: '))
         print('File successfully created.')
     elif choice == 2:
-        web.save_profile(web.get_active_session(all_profiles=True),
-                         input('Enter a file path for the created session files: '))
-        print('Files successfully created.')
+        # FIXME: This is still not optimal if no profiles can be found
+        created_files = web.save_profile(web.get_active_session(all_profiles=True),
+                                         input('Enter a file path for the created session files: '))
+        if created_files > 0:
+            print('Files successfully created.')
     elif choice == 3:
         web.access_by_file(input('Enter the file path to the session file you would like to open: '))
