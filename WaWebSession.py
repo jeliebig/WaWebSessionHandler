@@ -27,6 +27,7 @@ class SessionHandler:
     __browser_profile_list: list[str]
     __browser_options: Union[c_op.Options, f_op.Options]
     __driver: Union[c_wd.WebDriver, f_wd.WebDriver]
+    __custom_driver = False
     log: logging.Logger
 
     @staticmethod
@@ -57,24 +58,26 @@ class SessionHandler:
         return ls_dict
 
     def __refresh_profile_list(self) -> NoReturn:
-        self.log.debug('Getting browser profiles...')
-        if self.__browser_choice == Browser.CHROME:
-            self.__browser_profile_list = ['']
-            for profile_dir in os.listdir(self.__browser_user_dir):
-                if 'profile' in profile_dir.lower():
-                    if profile_dir != 'System Profile':
-                        self.__browser_profile_list.append(profile_dir)
-        elif self.__browser_choice == Browser.FIREFOX:
-            # TODO: consider reading out the profiles.ini
-            self.__browser_profile_list = []
-            for profile_dir in os.listdir(self.__browser_user_dir):
-                if not profile_dir.endswith('.default'):
-                    if os.path.isdir(os.path.join(self.__browser_user_dir, profile_dir)):
-                        self.__browser_profile_list.append(profile_dir)
+        if not self.__custom_driver:
+            self.log.debug('Getting browser profiles...')
+            if self.__browser_choice == Browser.CHROME:
+                self.__browser_profile_list = ['']
+                for profile_dir in os.listdir(self.__browser_user_dir):
+                    if 'profile' in profile_dir.lower():
+                        if profile_dir != 'System Profile':
+                            self.__browser_profile_list.append(profile_dir)
+            elif self.__browser_choice == Browser.FIREFOX:
+                # TODO: consider reading out the profiles.ini
+                self.__browser_profile_list = []
+                for profile_dir in os.listdir(self.__browser_user_dir):
+                    if not profile_dir.endswith('.default'):
+                        if os.path.isdir(os.path.join(self.__browser_user_dir, profile_dir)):
+                            self.__browser_profile_list.append(profile_dir)
 
-        self.log.debug('Browser profiles registered.')
+            self.log.debug('Browser profiles registered.')
 
     def __init_browser(self) -> NoReturn:
+        self.__custom_driver = False
         self.log.debug("Setting browser user dirs...")
         if self.__browser_choice == Browser.CHROME:
             self.__browser_options = webdriver.ChromeOptions()
@@ -118,63 +121,62 @@ class SessionHandler:
     def __get_indexed_db_user(self) -> list[dict[str, str]]:
         self.log.debug('Executing getIDBObjects function...')
         self.__driver.execute_script('''
-        window.waScript = {};
-        window.waScript.waSession = undefined;
+        document.waScript = {};
+        document.waScript.waSession = undefined;
         function getAllObjects() {
-            window.waScript.dbName = "wawc";
-            window.waScript.osName = "user";
-            window.waScript.db = undefined;
-            window.waScript.transaction = undefined;
-            window.waScript.objectStore = undefined;
-            window.waScript.getAllRequest = undefined;
-            window.waScript.request = indexedDB.open(window.waScript.dbName);
-            window.waScript.request.onsuccess = function(event) {
-                window.waScript.db = event.target.result;
-                window.waScript.transaction = window.waScript.db.transaction(window.waScript.osName);
-                window.waScript.objectStore = window.waScript.transaction.objectStore(window.waScript.osName);
-                window.waScript.getAllRequest = window.waScript.objectStore.getAll();
-                window.waScript.getAllRequest.onsuccess = function(getAllEvent) {
-                    window.waScript.waSession = getAllEvent.target.result;
+            document.waScript.dbName = "wawc";
+            document.waScript.osName = "user";
+            document.waScript.db = undefined;
+            document.waScript.transaction = undefined;
+            document.waScript.objectStore = undefined;
+            document.waScript.getAllRequest = undefined;
+            document.waScript.request = indexedDB.open(document.waScript.dbName);
+            document.waScript.request.onsuccess = function(event) {
+                document.waScript.db = event.target.result;
+                document.waScript.transaction = document.waScript.db.transaction(document.waScript.osName);
+                document.waScript.objectStore = document.waScript.transaction.objectStore(document.waScript.osName);
+                document.waScript.getAllRequest = document.waScript.objectStore.getAll();
+                document.waScript.getAllRequest.onsuccess = function(getAllEvent) {
+                    document.waScript.waSession = getAllEvent.target.result;
                 };
             };
         }
         getAllObjects();
         ''')
         self.log.debug('Waiting until IDB operation finished...')
-        while not self.__driver.execute_script('return window.waScript.waSession != undefined;'):
+        while not self.__driver.execute_script('return document.waScript.waSession != undefined;'):
             time.sleep(1)
         self.log.debug('Getting IDB results...')
-        wa_session_obj: list[dict[str, str]] = self.__driver.execute_script('return window.waScript.waSession;')
+        wa_session_obj: list[dict[str, str]] = self.__driver.execute_script('return document.waScript.waSession;')
         # self.log.debug('Got IDB data: %s', wa_session_obj)
         return wa_session_obj
 
     def __set_indexed_db_user(self, wa_session_obj: list[dict[str, str]]) -> NoReturn:
         self.log.debug('Inserting setIDBObjects function...')
-        # TODO: If I support loading multiple sessions in one browser window I only need to execute this once.
         self.__driver.execute_script('''
-        window.waScript = {};
-        window.waScript.insertDone = 0;
-        window.waScript.jsonObj = undefined;
-        window.waScript.setAllObjects = function (_jsonObj) {
-            window.waScript.jsonObj = _jsonObj;
-            window.waScript.dbName = "wawc";
-            window.waScript.osName = "user";
-            window.waScript.db;
-            window.waScript.transaction;
-            window.waScript.objectStore;
-            window.waScript.clearRequest;
-            window.waScript.addRequest;
-            window.waScript.request = indexedDB.open(window.waScript.dbName);
-            window.waScript.request.onsuccess = function(event) {
-                window.waScript.db = event.target.result;
-                window.waScript.transaction = window.waScript.db.transaction(window.waScript.osName, "readwrite");
-                window.waScript.objectStore = window.waScript.transaction.objectStore(window.waScript.osName);
-                window.waScript.clearRequest = window.waScript.objectStore.clear();
-                window.waScript.clearRequest.onsuccess = function(clearEvent) {
-                    for (var i=0; i<window.waScript.jsonObj.length; i++) {
-                        window.waScript.addRequest = window.waScript.objectStore.add(window.waScript.jsonObj[i]);
-                        window.waScript.addRequest.onsuccess = function(addEvent) {
-                            window.waScript.insertDone++;
+        document.waScript = {};
+        document.waScript.insertDone = 0;
+        document.waScript.jsonObj = undefined;
+        document.waScript.setAllObjects = function (_jsonObj) {
+            document.waScript.jsonObj = _jsonObj;
+            document.waScript.dbName = "wawc";
+            document.waScript.osName = "user";
+            document.waScript.db;
+            document.waScript.transaction;
+            document.waScript.objectStore;
+            document.waScript.clearRequest;
+            document.waScript.addRequest;
+            document.waScript.request = indexedDB.open(document.waScript.dbName);
+            document.waScript.request.onsuccess = function(event) {
+                document.waScript.db = event.target.result;
+                document.waScript.transaction = document.waScript.db.transaction(document.waScript.osName, "readwrite");
+                document.waScript.objectStore = document.waScript.transaction.objectStore(document.waScript.osName);
+                document.waScript.clearRequest = document.waScript.objectStore.clear();
+                document.waScript.clearRequest.onsuccess = function(clearEvent) {
+                    for (var i = 0; i < document.waScript.jsonObj.length; i++) {
+                        document.waScript.addRequest = document.waScript.objectStore.add(document.waScript.jsonObj[i]);
+                        document.waScript.addRequest.onsuccess = function(addEvent) {
+                            document.waScript.insertDone++;
                         };
                     }
                 };
@@ -185,16 +187,19 @@ class SessionHandler:
 
         # self.log.debug('Writing IDB data: %s', wa_session_obj)
         self.log.debug('Writing IDB data...')
-        self.__driver.execute_script('window.waScript.setAllObjects(arguments[0]);', wa_session_obj)
+        self.__driver.execute_script('document.waScript.setAllObjects(arguments[0]);', wa_session_obj)
 
         self.log.debug('Waiting until all objects are written to IDB...')
         # FIXME: This looks awful. Please find a way to make this look a little better.
         while not self.__driver.execute_script(
-                'return (window.waScript.insertDone == window.waScript.jsonObj.length);'):
+                'return (document.waScript.insertDone == document.waScript.jsonObj.length);'):
             time.sleep(1)
 
     def __verify_profile_name_exists(self, profile_name: str) -> bool:
         # self.__refresh_profile_list()
+        if self.__custom_driver:
+            # NOTE: unsure if this is the correct error type to raise
+            raise AssertionError('Do not call this method if you are using a custom webdriver.')
         # NOTE: Is this still required?
         if not isinstance(profile_name, str):
             raise TypeError('The provided profile_name is not a string.')
@@ -203,14 +208,25 @@ class SessionHandler:
         else:
             return True
 
-    def __start_session(self, options: Union[c_op.Options, f_op.Options],
+    def __start_session(self, options: Optional[Union[c_op.Options, f_op.Options]] = None,
                         profile_name: Optional[str] = None, wait_for_login=True) -> NoReturn:
-        self.log.debug('Starting browser... [HEADLESS: %s]', str(options.headless))
+        if not self.__custom_driver and options is None:
+            raise ValueError("Do not call this method without providing options for the webdriver.")
         if profile_name is None:
-            if self.__browser_choice == Browser.CHROME:
-                self.__driver = webdriver.Chrome(options=options)
-            elif self.__browser_choice == Browser.FIREFOX:
-                self.__driver = webdriver.Firefox(options=options)
+            if not self.__custom_driver:
+                self.log.debug('Starting browser... [HEADLESS: %s]', str(options.headless))
+                if self.__browser_choice == Browser.CHROME:
+                    self.__driver = webdriver.Chrome(options=options)
+                elif self.__browser_choice == Browser.FIREFOX:
+                    self.__driver = webdriver.Firefox(options=options)
+            else:
+                self.log.debug('Checking if current browser window can be used...')
+                if self.__browser_choice == Browser.CHROME:
+                    if self.__driver.current_url != 'chrome://new-tab-page/' and self.__driver.current_url != 'data:,':
+                        self.__driver.switch_to.new_window('tab')
+                elif self.__browser_choice == Browser.FIREFOX:
+                    if self.__driver.current_url != "about:blank":
+                        self.__driver.switch_to.new_window('tab')
 
             self.log.debug('Loading WhatsApp Web...')
             self.__driver.get(self.__URL)
@@ -221,6 +237,7 @@ class SessionHandler:
                     time.sleep(1)
                 self.log.debug('Login completed.')
         else:
+            self.log.debug('Starting browser... [HEADLESS: %s]', str(options.headless))
             if self.__browser_choice == Browser.CHROME:
                 options.add_argument('user-data-dir=%s' % os.path.join(self.__browser_user_dir, profile_name))
                 self.__driver = webdriver.Chrome(options=options)
@@ -240,24 +257,34 @@ class SessionHandler:
         self.__start_session(options, profile_name, wait_for_login)
 
     def __start_invisible_session(self, profile_name: Optional[str] = None) -> NoReturn:
-        self.__verify_profile_name_exists(profile_name)
+        if profile_name is not None:
+            self.__verify_profile_name_exists(profile_name)
         self.__start_session(self.__browser_options, profile_name)
 
     def __get_profile_storage(self, profile_name: Optional[str] = None) -> list[dict[str, str]]:
         if profile_name is None:
-            self.__start_visible_session()
+            if self.__custom_driver:
+                self.__start_session()
+            else:
+                self.__start_visible_session()
         else:
-            self.__verify_profile_name_exists(profile_name)
             self.__start_invisible_session(profile_name)
 
         indexed_db = self.__get_indexed_db_user()
 
-        self.log.debug("Closing browser...")
-        self.__driver.quit()
+        if not self.__custom_driver:
+            self.log.debug("Closing browser...")
+            self.__driver.quit()
+        else:
+            self.log.debug("Closing tab...")
+            self.__driver.close()
+            self.__driver.switch_to.window(self.__driver.window_handles[-1])
 
         return indexed_db
 
-    def __init__(self, browser: Optional[Union[Browser, str]] = None, log_level: Optional[Union[int, str]] = None):
+    def __init__(self, browser: Optional[Union[Browser, str]] = None,
+                 driver: Optional[Union[c_wd.WebDriver, f_wd.WebDriver]] = None,
+                 log_level: Optional[Union[int, str]] = None):
         self.log = logging.getLogger('WaWebSession:SessionHandler')
         log_format = logging.Formatter('%(asctime)s [%(levelname)s] (%(funcName)s): %(message)s')
 
@@ -277,20 +304,23 @@ class SessionHandler:
             raise OSError('Only Windows and Linux are supported for now.')
         self.log.debug('Detected platform: %s', self.__platform)
 
-        if browser:
-            self.set_browser(browser)
+        if driver:
+            self.set_custom_webdriver(driver)
         else:
-            input_browser_choice = 0
-            while input_browser_choice != 1 and input_browser_choice != 2:
-                print('1) Chrome\n'
-                      '2) Firefox\n')
-                input_browser_choice = int(input('Select a browser by choosing a number from the list: '))
-            if input_browser_choice == 1:
-                self.set_browser(Browser.CHROME)
-            elif input_browser_choice == 2:
-                self.set_browser(Browser.FIREFOX)
+            if browser:
+                self.set_browser(browser)
+            else:
+                input_browser_choice = 0
+                while input_browser_choice != 1 and input_browser_choice != 2:
+                    print('1) Chrome\n'
+                          '2) Firefox\n')
+                    input_browser_choice = int(input('Select a browser by choosing a number from the list: '))
+                if input_browser_choice == 1:
+                    self.set_browser(Browser.CHROME)
+                elif input_browser_choice == 2:
+                    self.set_browser(Browser.FIREFOX)
 
-        self.__init_browser()
+            self.__init_browser()
 
     def set_log_level(self, new_log_level: Union[int, str]) -> NoReturn:
         possible_level_strings = ['debug', 'info', 'warning', 'error', 'critical']
@@ -323,7 +353,18 @@ class SessionHandler:
 
         self.log.setLevel(self.__log_level)
 
+    def set_custom_webdriver(self, driver: Union[c_wd.WebDriver, f_wd.WebDriver]) -> NoReturn:
+        if isinstance(driver, c_wd.WebDriver):
+            self.__browser_choice = Browser.CHROME
+        elif isinstance(driver, f_wd.WebDriver):
+            self.__browser_choice = Browser.FIREFOX
+        self.__custom_driver = True
+        self.__driver = driver
+
     def set_browser(self, browser: Union[Browser, str]) -> NoReturn:
+        if self.__driver:
+            self.__driver.quit()
+
         if isinstance(browser, str):
             if browser.lower() == 'chrome':
                 self.log.debug('Setting browser... [TYPE: %s]', 'Chrome')
@@ -344,6 +385,7 @@ class SessionHandler:
             raise TypeError(
                 'Browser type invalid. Try to use Browser.CHROME or Browser.FIREFOX instead.'
             )
+        self.__init_browser()
 
     # TODO: Think about type aliasing
     def get_active_session(self, use_profile: Optional[Union[list[str], str]] = None, all_profiles=False) -> Union[
@@ -354,10 +396,13 @@ class SessionHandler:
         use_profile_list = []
         self.__refresh_profile_list()
 
+        if self.__custom_driver:
+            raise AssertionError('Do not call this method if you are using a custom webdriver.')
+
         if all_profiles:
             use_profile_list.extend(self.__browser_profile_list)
             self.log.info(
-                "Trying to get active sessions for all browser profiles of the selected type..."
+                'Trying to get active sessions for all browser profiles of the selected type...'
             )
         else:
             if use_profile and use_profile not in self.__browser_profile_list:
@@ -371,7 +416,7 @@ class SessionHandler:
             else:
                 # NOTE: Should this be a TypeError instead?
                 raise ValueError(
-                    "Invalid profile provided. Make sure you provided a list of profiles or a profile name."
+                    'Invalid profile provided. Make sure you provided a list of profiles or a profile name.'
                 )
 
         for profile in use_profile_list:
@@ -389,20 +434,24 @@ class SessionHandler:
                 'Make sure you only pass one session to this method.'
             )
 
-        self.__start_visible_session(wait_for_login=False)
+        if not self.__custom_driver:
+            self.__start_visible_session(wait_for_login=False)
+        else:
+            self.__start_session(wait_for_login=False)
 
         self.__set_indexed_db_user(wa_profile_obj)
         self.__set_local_storage(self.convert_idb_to_ls_obj(wa_profile_obj))
         self.log.debug('Reloading WhatsApp Web...')
         self.__driver.refresh()
 
-        self.log.debug('Waiting until the browser window is closed...')
-        while True:
-            try:
-                _ = self.__driver.window_handles
-                time.sleep(1)
-            except WebDriverException:
-                break
+        if not self.__custom_driver:
+            self.log.debug('Waiting until the browser window is closed...')
+            while True:
+                try:
+                    _ = self.__driver.current_window_handle
+                    time.sleep(1)
+                except WebDriverException:
+                    break
 
     def access_by_file(self, profile_file: str) -> NoReturn:
         profile_file = os.path.normpath(profile_file)
