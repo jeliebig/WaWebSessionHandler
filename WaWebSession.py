@@ -26,7 +26,7 @@ class SessionHandler:
     __browser_user_dir: str
     __browser_profile_list: list[str]
     __browser_options: Union[c_op.Options, f_op.Options]
-    __driver: Union[c_wd.WebDriver, f_wd.WebDriver]
+    __driver: Union[c_wd.WebDriver, f_wd.WebDriver] = None
     __custom_driver = False
     log: logging.Logger
 
@@ -362,7 +362,7 @@ class SessionHandler:
         self.__driver = driver
 
     def set_browser(self, browser: Union[Browser, str]) -> NoReturn:
-        if self.__driver:
+        if self.__driver is not None:
             self.__driver.quit()
 
         if isinstance(browser, str):
