@@ -223,10 +223,12 @@ class SessionHandler:
                 self.log.debug('Checking if current browser window can be used...')
                 if self.__browser_choice == Browser.CHROME:
                     if self.__driver.current_url != 'chrome://new-tab-page/' and self.__driver.current_url != 'data:,':
-                        self.__driver.switch_to.new_window('tab')
+                        self.__driver.execute_script('window.open()')
+                        self.__driver.switch_to.window(self.__driver.window_handles[-1])
                 elif self.__browser_choice == Browser.FIREFOX:
                     if self.__driver.current_url != "about:blank":
-                        self.__driver.switch_to.new_window('tab')
+                        self.__driver.execute_script('window.open()')
+                        self.__driver.switch_to.window(self.__driver.window_handles[-1])
 
             self.log.debug('Loading WhatsApp Web...')
             self.__driver.get(self.__URL)
