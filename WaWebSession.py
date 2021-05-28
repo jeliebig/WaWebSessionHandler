@@ -12,6 +12,9 @@ import selenium.webdriver.firefox.options as f_op
 import selenium.webdriver.firefox.webdriver as f_wd
 from selenium import webdriver
 from selenium.common.exceptions import WebDriverException
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
 
 
 class Browser(Enum):
@@ -46,7 +49,7 @@ class SessionHandler:
     @staticmethod
     def convert_ls_to_idb_obj(ls_obj: dict[str, str]) -> list[dict[str, str]]:
         idb_list = []
-        for ls_key, ls_val in ls_obj:
+        for ls_key, ls_val in ls_obj.items():
             idb_list.append({'key': ls_key, 'value': ls_val})
         return idb_list
 
@@ -56,6 +59,19 @@ class SessionHandler:
         for idb_entry in idb_obj:
             ls_dict[idb_entry['key']] = idb_entry['value']
         return ls_dict
+
+    @staticmethod
+    def get_newer_obj_from_ls_cmp(load_ls_obj: dict[str, str],
+                                  first_cmp_obj: dict[str, str], second_cmp_obj: dict[str, str]) -> dict[str, str]:
+        for ls_key, ls_val in load_ls_obj.items():
+            # check if the value really changed
+            if first_cmp_obj[ls_key] != second_cmp_obj[ls_key]:
+                # using two ifs in case they really change both values at some point
+                if first_cmp_obj[ls_key] != ls_val:
+                    return first_cmp_obj
+                if second_cmp_obj[ls_key] != ls_val:
+                    return second_cmp_obj
+        return load_ls_obj
 
     def __refresh_profile_list(self) -> NoReturn:
         if not self.__custom_driver:
@@ -107,7 +123,7 @@ class SessionHandler:
         return self.__driver.execute_script('''
         var waSession = {};
         waLs = window.localStorage;
-        for (int i = 0; i < waLs.length; i++) {
+        for (var i = 0; i < waLs.length; i++) {
             waSession[waLs.key(i)] = waLs.getItem(waLs.key(i));
         }
         return waSession;
@@ -429,7 +445,7 @@ class SessionHandler:
     def create_new_session(self) -> list[dict[str, str]]:
         return self.__get_profile_storage()
 
-    def access_by_obj(self, wa_profile_obj: list[dict[str, str]]) -> NoReturn:
+    def access_by_obj(self, wa_profile_obj: list[dict[str, str]]) -> list[dict[str, str]]:
         if not self.verify_profile_object(wa_profile_obj):
             raise TypeError(
                 'Invalid profile object provided. '
@@ -445,8 +461,18 @@ class SessionHandler:
         self.__set_local_storage(self.convert_idb_to_ls_obj(wa_profile_obj))
         self.log.debug('Reloading WhatsApp Web...')
         self.__driver.refresh()
+        self.log.debug('Waiting until WhatsApp Web finished loading...')
+        wait = WebDriverWait(self.__driver, 60)
+        wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, 'div._2DPZK:nth-child(3)')))
+        self.log.debug('WhatsApp Web is now usable!')
+        return_idb_obj = self.convert_ls_to_idb_obj(self.get_newer_obj_from_ls_cmp(
+            self.convert_idb_to_ls_obj(wa_profile_obj),
+            self.__get_local_storage(),
+            self.convert_idb_to_ls_obj(self.__get_indexed_db_user()))
+        )
 
         if not self.__custom_driver:
+            self.log.warning('Please do not reload the page manually.')
             self.log.debug('Waiting until the browser window is closed...')
             while True:
                 try:
@@ -454,6 +480,7 @@ class SessionHandler:
                     time.sleep(1)
                 except WebDriverException:
                     break
+        return return_idb_obj
 
     def access_by_file(self, profile_file: str) -> NoReturn:
         profile_file = os.path.normpath(profile_file)
@@ -471,7 +498,8 @@ class SessionHandler:
                 )
 
             self.log.debug('WaSession object is valid.')
-            self.access_by_obj(wa_profile_obj)
+            new_wa_profile_obj = self.access_by_obj(wa_profile_obj)
+            self.save_profile(new_wa_profile_obj, profile_file)
 
         else:
             raise FileNotFoundError('Make sure you pass a valid WaSession file to this method.')
