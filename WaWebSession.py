@@ -463,7 +463,9 @@ class SessionHandler:
         self.__driver.refresh()
         self.log.debug('Waiting until WhatsApp Web finished loading...')
         wait = WebDriverWait(self.__driver, 60)
-        wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, 'div._2DPZK:nth-child(3)')))
+        wait.until(
+            EC.visibility_of_element_located((By.XPATH, '/html/body/div/div[1]/div[1]/div[4]/div/div/div[2]/h1'))
+        )
         self.log.debug('WhatsApp Web is now usable!')
         return_idb_obj = self.convert_ls_to_idb_obj(self.get_newer_obj_from_ls_cmp(
             self.convert_idb_to_ls_obj(wa_profile_obj),
