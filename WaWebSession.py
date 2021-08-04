@@ -37,10 +37,10 @@ class SessionHandler:
     def verify_profile_object(profile_obj: Union[list[dict[str, str]], list[str]]) -> bool:
         for entry in profile_obj:
             if isinstance(entry, str):
-                if 'WASecretBundle' in entry:
+                if 'WASecretBundle' in entry or 'logout-token' in entry:
                     return True
             elif isinstance(entry, dict):
-                if 'key' in entry.keys() and 'WASecretBundle' in entry['key']:
+                if 'key' in entry.keys() and ('WASecretBundle' in entry['key'] or 'logout-token' in entry['key']):
                     return True
             else:
                 raise TypeError
@@ -64,6 +64,9 @@ class SessionHandler:
     def get_newer_obj_from_ls_cmp(load_ls_obj: dict[str, str],
                                   first_cmp_obj: dict[str, str], second_cmp_obj: dict[str, str]) -> dict[str, str]:
         for ls_key, ls_val in load_ls_obj.items():
+            # TODO: does this still result in the behavior we want?
+            if ls_key not in first_cmp_obj.keys() or ls_key not in second_cmp_obj.keys():
+                continue
             # check if the value really changed
             if first_cmp_obj[ls_key] != second_cmp_obj[ls_key]:
                 # using two ifs in case they really change both values at some point
@@ -250,9 +253,18 @@ class SessionHandler:
             self.__driver.get(self.__URL)
 
             if wait_for_login:
-                self.log.debug('Waiting for login...')
+                timeout = 120
+                login_success = True
+                self.log.debug('Waiting for login... [Timeout: %ss]', timeout)
                 while not self.verify_profile_object(self.__get_indexed_db_user()):
                     time.sleep(1)
+                    timeout -= 1
+                    if timeout == 0:
+                        login_success = False
+                        break
+                if not login_success:
+                    self.log.error('Login was not completed in time. Aborting...')
+                    return
                 self.log.debug('Login completed.')
         else:
             self.log.debug('Starting browser... [HEADLESS: %s]', str(options.headless))
