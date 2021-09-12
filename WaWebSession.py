@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import json
 import logging
 import os
@@ -27,14 +28,14 @@ class SessionHandler:
     __browser_choice = 0
     __log_level: int
     __browser_user_dir: str
-    __browser_profile_list: list[str]
+    __browser_profile_list: 'list[str]'
     __browser_options: Union[c_op.Options, f_op.Options]
     __driver: Union[c_wd.WebDriver, f_wd.WebDriver] = None
     __custom_driver = False
     log: logging.Logger
 
     @staticmethod
-    def verify_profile_object(profile_obj: Union[list[dict[str, str]], list[str]]) -> bool:
+    def verify_profile_object(profile_obj: Union['list[dict[str, str]]', 'list[str]']) -> bool:
         for entry in profile_obj:
             if isinstance(entry, str):
                 if 'WASecretBundle' in entry or 'logout-token' in entry:
@@ -47,22 +48,22 @@ class SessionHandler:
         return False
 
     @staticmethod
-    def convert_ls_to_idb_obj(ls_obj: dict[str, str]) -> list[dict[str, str]]:
+    def convert_ls_to_idb_obj(ls_obj: 'dict[str, str]') -> 'list[dict[str, str]]':
         idb_list = []
         for ls_key, ls_val in ls_obj.items():
             idb_list.append({'key': ls_key, 'value': ls_val})
         return idb_list
 
     @staticmethod
-    def convert_idb_to_ls_obj(idb_obj: list[dict[str, str]]) -> dict[str, str]:
+    def convert_idb_to_ls_obj(idb_obj: 'list[dict[str, str]]') -> 'dict[str, str]':
         ls_dict = {}
         for idb_entry in idb_obj:
             ls_dict[idb_entry['key']] = idb_entry['value']
         return ls_dict
 
     @staticmethod
-    def get_newer_obj_from_ls_cmp(load_ls_obj: dict[str, str],
-                                  first_cmp_obj: dict[str, str], second_cmp_obj: dict[str, str]) -> dict[str, str]:
+    def get_newer_obj_from_ls_cmp(load_ls_obj: 'dict[str, str]',
+                                  first_cmp_obj: 'dict[str, str]', second_cmp_obj: 'dict[str, str]') -> 'dict[str, str]':
         for ls_key, ls_val in load_ls_obj.items():
             # TODO: does this still result in the behavior we want?
             if ls_key not in first_cmp_obj.keys() or ls_key not in second_cmp_obj.keys():
@@ -121,7 +122,7 @@ class SessionHandler:
         self.__browser_options.headless = True
         self.__refresh_profile_list()
 
-    def __get_local_storage(self) -> dict[str, str]:
+    def __get_local_storage(self) -> 'dict[str, str]':
         self.log.debug('Executing getLS function...')
         return self.__driver.execute_script('''
         var waSession = {};
@@ -132,12 +133,12 @@ class SessionHandler:
         return waSession;
         ''')
 
-    def __set_local_storage(self, wa_session_obj: dict[str, str]) -> NoReturn:
+    def __set_local_storage(self, wa_session_obj: 'dict[str, str]') -> NoReturn:
         for ls_key, ls_val in wa_session_obj.items():
             self.__driver.execute_script('window.localStorage.setItem(arguments[0], arguments[1]);',
                                          ls_key, ls_val)
 
-    def __get_indexed_db_user(self) -> list[dict[str, str]]:
+    def __get_indexed_db_user(self) -> 'list[dict[str, str]]':
         self.log.debug('Executing getIDBObjects function...')
         self.__driver.execute_script('''
         document.waScript = {};
@@ -170,7 +171,7 @@ class SessionHandler:
         # self.log.debug('Got IDB data: %s', wa_session_obj)
         return wa_session_obj
 
-    def __set_indexed_db_user(self, wa_session_obj: list[dict[str, str]]) -> NoReturn:
+    def __set_indexed_db_user(self, wa_session_obj: 'list[dict[str, str]]') -> NoReturn:
         self.log.debug('Inserting setIDBObjects function...')
         self.__driver.execute_script('''
         document.waScript = {};
@@ -291,7 +292,7 @@ class SessionHandler:
             self.__verify_profile_name_exists(profile_name)
         self.__start_session(self.__browser_options, profile_name)
 
-    def __get_profile_storage(self, profile_name: Optional[str] = None) -> list[dict[str, str]]:
+    def __get_profile_storage(self, profile_name: Optional[str] = None) -> 'list[dict[str, str]]':
         if profile_name is None:
             if self.__custom_driver:
                 self.__start_session()
@@ -418,8 +419,8 @@ class SessionHandler:
         self.__init_browser()
 
     # TODO: Think about type aliasing
-    def get_active_session(self, use_profile: Optional[Union[list[str], str]] = None, all_profiles=False) -> Union[
-        list[dict[str, str]], dict[str, list[dict[str, str]]]
+    def get_active_session(self, use_profile: Optional[Union['list[str]', str]] = None, all_profiles=False) -> Union[
+        'list[dict[str, str]]', 'dict[str, list[dict[str, str]]]'
     ]:
         self.log.warning('Make sure the specified browser profile is not being used by another process.')
         profile_storage_dict = {}
@@ -454,10 +455,10 @@ class SessionHandler:
 
         return profile_storage_dict
 
-    def create_new_session(self) -> list[dict[str, str]]:
+    def create_new_session(self) -> 'list[dict[str, str]]':
         return self.__get_profile_storage()
 
-    def access_by_obj(self, wa_profile_obj: list[dict[str, str]]) -> list[dict[str, str]]:
+    def access_by_obj(self, wa_profile_obj: 'list[dict[str, str]]') -> 'list[dict[str, str]]':
         if not self.verify_profile_object(wa_profile_obj):
             raise TypeError(
                 'Invalid profile object provided. '
@@ -518,7 +519,7 @@ class SessionHandler:
         else:
             raise FileNotFoundError('Make sure you pass a valid WaSession file to this method.')
 
-    def save_profile(self, wa_profile_obj: Union[list[dict[str, str]], dict[str, list[dict[str, str]]]],
+    def save_profile(self, wa_profile_obj: Union['list[dict[str, str]]', 'dict[str, list[dict[str, str]]]'],
                      file_path: str) -> Union[NoReturn, int]:
         file_path = os.path.normpath(file_path)
 
