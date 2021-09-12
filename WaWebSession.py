@@ -62,8 +62,8 @@ class SessionHandler:
         return ls_dict
 
     @staticmethod
-    def get_newer_obj_from_ls_cmp(load_ls_obj: 'dict[str, str]',
-                                  first_cmp_obj: 'dict[str, str]', second_cmp_obj: 'dict[str, str]') -> 'dict[str, str]':
+    def get_newer_obj_from_ls_cmp(load_ls_obj: 'dict[str, str]', first_cmp_obj: 'dict[str, str]',
+                                  second_cmp_obj: 'dict[str, str]') -> 'dict[str, str]':
         for ls_key, ls_val in load_ls_obj.items():
             # TODO: does this still result in the behavior we want?
             if ls_key not in first_cmp_obj.keys() or ls_key not in second_cmp_obj.keys():
@@ -79,22 +79,29 @@ class SessionHandler:
 
     def __refresh_profile_list(self) -> NoReturn:
         if not self.__custom_driver:
-            self.log.debug('Getting browser profiles...')
-            if self.__browser_choice == Browser.CHROME:
-                self.__browser_profile_list = ['']
-                for profile_dir in os.listdir(self.__browser_user_dir):
-                    if 'profile' in profile_dir.lower():
-                        if profile_dir != 'System Profile':
-                            self.__browser_profile_list.append(profile_dir)
-            elif self.__browser_choice == Browser.FIREFOX:
-                # TODO: consider reading out the profiles.ini
-                self.__browser_profile_list = []
-                for profile_dir in os.listdir(self.__browser_user_dir):
-                    if not profile_dir.endswith('.default'):
-                        if os.path.isdir(os.path.join(self.__browser_user_dir, profile_dir)):
-                            self.__browser_profile_list.append(profile_dir)
+            if os.path.isdir(self.__browser_user_dir):
+                self.log.debug('Getting browser profiles...')
+                if self.__browser_choice == Browser.CHROME:
+                    self.__browser_profile_list = ['']
+                    for profile_dir in os.listdir(self.__browser_user_dir):
+                        if 'profile' in profile_dir.lower():
+                            if profile_dir != 'System Profile':
+                                self.__browser_profile_list.append(profile_dir)
+                elif self.__browser_choice == Browser.FIREFOX:
+                    # TODO: consider reading out the profiles.ini
+                    self.__browser_profile_list = []
+                    for profile_dir in os.listdir(self.__browser_user_dir):
+                        if not profile_dir.endswith('.default'):
+                            if os.path.isdir(os.path.join(self.__browser_user_dir, profile_dir)):
+                                self.__browser_profile_list.append(profile_dir)
 
-            self.log.debug('Browser profiles registered.')
+                self.log.debug('Browser profiles registered.')
+            else:
+                self.log.error('Browser user dir does not exist.')
+                self.__browser_profile_list = []
+        else:
+            # TODO: Figure out why I did that before
+            raise AssertionError('Do not call this method while using a custom driver.')
 
     def __init_browser(self) -> NoReturn:
         self.__custom_driver = False
@@ -224,7 +231,9 @@ class SessionHandler:
         if not isinstance(profile_name, str):
             raise TypeError('The provided profile_name is not a string.')
         if profile_name not in self.__browser_profile_list:
-            raise ValueError('The provided profile_name was not found. Make sure the name is correct.')
+            # TODO: consider removing log.error() here
+            self.log.error('The provided profile_name was not found. Make sure the name is correct.')
+            return False
         else:
             return True
 
