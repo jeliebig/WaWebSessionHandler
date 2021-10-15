@@ -145,7 +145,7 @@ class SessionHandler:
                                          ls_key, ls_val)
 
     def __get_indexed_db_user(self) -> 'list[dict[str, str]]':
-        self.__log.info('Executing getIDBObjects function...')
+        self.__log.debug('Executing getIDBObjects function...')
         self.__driver.execute_script('''
         document.waScript = {};
         document.waScript.waSession = undefined;
@@ -169,10 +169,10 @@ class SessionHandler:
         }
         getAllObjects();
         ''')
-        self.__log.info('Waiting until IDB operation finished...')
+        self.__log.debug('Waiting until IDB operation finished...')
         while not self.__driver.execute_script('return document.waScript.waSession != undefined;'):
             time.sleep(1)
-        self.__log.info('Getting IDB results...')
+        self.__log.debug('Getting IDB results...')
         wa_session_obj: list[dict[str, str]] = self.__driver.execute_script('return document.waScript.waSession;')
         # self.__log.debug('Got IDB data: %s', wa_session_obj)
         return wa_session_obj
@@ -214,7 +214,7 @@ class SessionHandler:
         self.__log.info('Writing IDB data...')
         self.__driver.execute_script('document.waScript.setAllObjects(arguments[0]);', wa_session_obj)
 
-        self.__log.info('Waiting until all objects are written to IDB...')
+        self.__log.debug('Waiting until all objects are written to IDB...')
         # FIXME: This looks awful. Please find a way to make this look a little better.
         while not self.__driver.execute_script(
                 'return (document.waScript.insertDone == document.waScript.jsonObj.length);'):
@@ -317,6 +317,7 @@ class SessionHandler:
     def __init__(self, browser: Optional[Union[Browser, str]] = None,
                  driver: Optional[Union[c_wd.WebDriver, f_wd.WebDriver]] = None):
         self.__log = logging.getLogger('WaWebSession')
+        self.__log.setLevel(logging.DEBUG)
 
         self.__platform = platform.system().lower()
         if self.__platform != 'windows' and self.__platform != 'linux':
@@ -423,7 +424,7 @@ class SessionHandler:
         self.__set_local_storage(self.convert_idb_to_ls_obj(wa_profile_obj))
         self.__log.info('Reloading WhatsApp Web...')
         self.__driver.refresh()
-        self.__log.info('Waiting until WhatsApp Web finished loading...')
+        self.__log.debug('Waiting until WhatsApp Web finished loading...')
         wait = WebDriverWait(self.__driver, 60)
         wait.until(
             ec.visibility_of_element_located((By.XPATH, '/html/body/div/div[1]/div[1]/div[4]/div/div/div[2]/h1'))
@@ -477,28 +478,32 @@ class SessionHandler:
             with open(file_path, 'w') as file:
                 json.dump(wa_profile_obj, file, indent=2)
         else:
-            self.__log.info('Scanning the list for multiple WaSession objects...')
-            if len(wa_profile_obj) == 0:
-                raise ValueError(
-                    'Could not find any profiles in the list. Make sure to specified file path is correct.'
-                )
+            if isinstance(wa_profile_obj, dict):
+                self.__log.info('Scanning the list for multiple WaSession objects...')
+                if len(wa_profile_obj) == 0:
+                    raise ValueError(
+                        'Could not find any profiles in the list. Make sure to specified file path is correct.'
+                    )
 
-            saved_profiles = 0
-            for profile_name in wa_profile_obj.keys():
-                profile_storage = wa_profile_obj[profile_name]
-                if self.verify_profile_object(profile_storage):
-                    self.__log.info('Found a new profile in the list!')
-                    single_profile_name = os.path.basename(file_path) + '-' + profile_name
-                    self.save_profile(profile_storage, os.path.join(os.path.dirname(file_path), single_profile_name))
-                    saved_profiles += 1
-            if saved_profiles > 0:
-                if saved_profiles > 1:
-                    self.__log.info('Saved %s profile objects as files.', saved_profiles)
+                saved_profiles = 0
+                for profile_name in wa_profile_obj.keys():
+                    profile_storage = wa_profile_obj[profile_name]
+                    if self.verify_profile_object(profile_storage):
+                        self.__log.info('Found a new profile in the list!')
+                        single_profile_name = os.path.basename(file_path) + '-' + profile_name
+                        self.save_profile(profile_storage,
+                                          os.path.join(os.path.dirname(file_path), single_profile_name))
+                        saved_profiles += 1
+                if saved_profiles > 0:
+                    if saved_profiles > 1:
+                        self.__log.info('Saved %s profile objects as files.', saved_profiles)
+                    else:
+                        self.__log.info('Saved %s profile object as file.', saved_profiles)
                 else:
-                    self.__log.info('Saved %s profile object as file.', saved_profiles)
+                    self.__log.error("Could not find any active profiles in the list.")
+                return saved_profiles
             else:
-                self.__log.error("Could not find any active profiles in the list.")
-            return saved_profiles
+                return ValueError('WaSession object is not valid.')
 
 
 if __name__ == '__main__':
@@ -530,11 +535,24 @@ if __name__ == '__main__':
               '3) Open a session from a file\n')
         choice = int(input('Select an option from the list: '))
     if choice == 1:
-        web.save_profile(web.get_active_session(), input('Enter a file path for the created session file: '))
-        print('File successfully created.')
+        waSession = web.get_active_session()
+        if web.verify_profile_object(waSession):
+            web.save_profile(waSession, input('Enter a file path for the created session file: '))
+            print('File successfully created.')
     elif choice == 2:
-        # FIXME: This is still not optimal if no profiles can be found
-        created_files = web.save_profile(web.get_active_session(all_profiles=True),
+        waSessions = web.get_active_session(all_profiles=True)
+        if len(waSessions) > 0:
+            verified_profiles = 0
+            for waProfile in waSessions.keys():
+                if web.verify_profile_object(waSessions[waProfile]):
+                    verified_profiles += 1
+            if verified_profiles == 0:
+                print("No active sessions found. Exiting...")
+                exit(1)
+        else:
+            print("No active sessions found. Exiting...")
+            exit(1)
+        created_files = web.save_profile(waSessions,
                                          input('Enter a file path for the created session files: '))
         if created_files > 0:
             print('Files successfully created.')
