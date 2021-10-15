@@ -145,7 +145,7 @@ class SessionHandler:
                                          ls_key, ls_val)
 
     def __get_indexed_db_user(self) -> 'list[dict[str, str]]':
-        self.__log.debug('Executing getIDBObjects function...')
+        self.__log.info('Executing getIDBObjects function...')
         self.__driver.execute_script('''
         document.waScript = {};
         document.waScript.waSession = undefined;
@@ -169,10 +169,10 @@ class SessionHandler:
         }
         getAllObjects();
         ''')
-        self.__log.debug('Waiting until IDB operation finished...')
+        self.__log.info('Waiting until IDB operation finished...')
         while not self.__driver.execute_script('return document.waScript.waSession != undefined;'):
             time.sleep(1)
-        self.__log.debug('Getting IDB results...')
+        self.__log.info('Getting IDB results...')
         wa_session_obj: list[dict[str, str]] = self.__driver.execute_script('return document.waScript.waSession;')
         # self.__log.debug('Got IDB data: %s', wa_session_obj)
         return wa_session_obj
@@ -211,10 +211,10 @@ class SessionHandler:
         ''')
         self.__log.debug('setIDBObjects function inserted.')
 
-        self.__log.debug('Writing IDB data...')
+        self.__log.info('Writing IDB data...')
         self.__driver.execute_script('document.waScript.setAllObjects(arguments[0]);', wa_session_obj)
 
-        self.__log.debug('Waiting until all objects are written to IDB...')
+        self.__log.info('Waiting until all objects are written to IDB...')
         # FIXME: This looks awful. Please find a way to make this look a little better.
         while not self.__driver.execute_script(
                 'return (document.waScript.insertDone == document.waScript.jsonObj.length);'):
@@ -235,7 +235,7 @@ class SessionHandler:
             raise ValueError("Do not call this method without providing options for the webdriver.")
         if profile_name is None:
             if not self.__custom_driver:
-                self.__log.debug('Starting browser... [HEADLESS: %s]', str(options.headless))
+                self.__log.info('Starting browser... [HEADLESS: %s]', str(options.headless))
                 if self.__browser_choice == Browser.CHROME:
                     self.__driver = webdriver.Chrome(options=options)
                 elif self.__browser_choice == Browser.FIREFOX:
@@ -251,13 +251,13 @@ class SessionHandler:
                         self.__driver.execute_script('window.open()')
                         self.__driver.switch_to.window(self.__driver.window_handles[-1])
 
-            self.__log.debug('Loading WhatsApp Web...')
+            self.__log.info('Loading WhatsApp Web...')
             self.__driver.get(self.__URL)
 
             if wait_for_login:
                 timeout = 120
                 login_success = True
-                self.__log.debug('Waiting for login... [Timeout: %ss]', timeout)
+                self.__log.info('Waiting for login... [Timeout: %ss]', timeout)
                 while not self.verify_profile_object(self.__get_indexed_db_user()):
                     time.sleep(1)
                     timeout -= 1
@@ -267,9 +267,9 @@ class SessionHandler:
                 if not login_success:
                     self.__log.error('Login was not completed in time. Aborting...')
                     return
-                self.__log.debug('Login completed.')
+                self.__log.info('Login completed.')
         else:
-            self.__log.debug('Starting browser... [HEADLESS: %s]', str(options.headless))
+            self.__log.info('Starting browser... [HEADLESS: %s]', str(options.headless))
             if self.__browser_choice == Browser.CHROME:
                 options.add_argument('user-data-dir=%s' % os.path.join(self.__browser_user_dir, profile_name))
                 self.__driver = webdriver.Chrome(options=options)
@@ -277,7 +277,7 @@ class SessionHandler:
                 fire_profile = webdriver.FirefoxProfile(os.path.join(self.__browser_user_dir, profile_name))
                 self.__driver = webdriver.Firefox(fire_profile, options=options)
 
-            self.__log.debug('Loading WhatsApp Web...')
+            self.__log.info('Loading WhatsApp Web...')
             self.__driver.get(self.__URL)
 
     def __start_visible_session(self, profile_name: Optional[str] = None, wait_for_login=True) -> NoReturn:
@@ -305,10 +305,10 @@ class SessionHandler:
         indexed_db = self.__get_indexed_db_user()
 
         if not self.__custom_driver:
-            self.__log.debug("Closing browser...")
+            self.__log.info("Closing browser...")
             self.__driver.quit()
         else:
-            self.__log.debug("Closing tab...")
+            self.__log.info("Closing tab...")
             self.__driver.close()
             self.__driver.switch_to.window(self.__driver.window_handles[-1])
 
@@ -421,14 +421,14 @@ class SessionHandler:
 
         self.__set_indexed_db_user(wa_profile_obj)
         self.__set_local_storage(self.convert_idb_to_ls_obj(wa_profile_obj))
-        self.__log.debug('Reloading WhatsApp Web...')
+        self.__log.info('Reloading WhatsApp Web...')
         self.__driver.refresh()
-        self.__log.debug('Waiting until WhatsApp Web finished loading...')
+        self.__log.info('Waiting until WhatsApp Web finished loading...')
         wait = WebDriverWait(self.__driver, 60)
         wait.until(
             ec.visibility_of_element_located((By.XPATH, '/html/body/div/div[1]/div[1]/div[4]/div/div/div[2]/h1'))
         )
-        self.__log.debug('WhatsApp Web is now usable!')
+        self.__log.info('WhatsApp Web is now usable!')
         return_idb_obj = self.convert_ls_to_idb_obj(self.get_newer_obj_from_ls_cmp(
             self.convert_idb_to_ls_obj(wa_profile_obj),
             self.__get_local_storage(),
@@ -437,7 +437,7 @@ class SessionHandler:
 
         if not self.__custom_driver:
             self.__log.info('Do not reload the page manually.')
-            self.__log.debug('Waiting until the browser window is closed...')
+            self.__log.info('Waiting until the browser window is closed...')
             while True:
                 try:
                     _ = self.__driver.current_window_handle
@@ -461,7 +461,7 @@ class SessionHandler:
                     'Make sure you only pass one WaSession file to this method.'
                 )
 
-            self.__log.debug('WaSession object is valid.')
+            self.__log.info('WaSession object is valid.')
             new_wa_profile_obj = self.access_by_obj(wa_profile_obj)
             self.save_profile(new_wa_profile_obj, profile_file)
 
@@ -473,11 +473,11 @@ class SessionHandler:
         file_path = os.path.normpath(file_path)
 
         if self.verify_profile_object(wa_profile_obj):
-            self.__log.debug('Saving WaSession object to file...')
+            self.__log.info('Saving WaSession object to file...')
             with open(file_path, 'w') as file:
                 json.dump(wa_profile_obj, file, indent=2)
         else:
-            self.__log.debug('Scanning the list for multiple WaSession objects...')
+            self.__log.info('Scanning the list for multiple WaSession objects...')
             if len(wa_profile_obj) == 0:
                 raise ValueError(
                     'Could not find any profiles in the list. Make sure to specified file path is correct.'
@@ -487,15 +487,15 @@ class SessionHandler:
             for profile_name in wa_profile_obj.keys():
                 profile_storage = wa_profile_obj[profile_name]
                 if self.verify_profile_object(profile_storage):
-                    self.__log.debug('Found a new profile in the list!')
+                    self.__log.info('Found a new profile in the list!')
                     single_profile_name = os.path.basename(file_path) + '-' + profile_name
                     self.save_profile(profile_storage, os.path.join(os.path.dirname(file_path), single_profile_name))
                     saved_profiles += 1
             if saved_profiles > 0:
                 if saved_profiles > 1:
-                    self.__log.debug('Saved %s profile objects as files.', saved_profiles)
+                    self.__log.info('Saved %s profile objects as files.', saved_profiles)
                 else:
-                    self.__log.debug('Saved %s profile object as file.', saved_profiles)
+                    self.__log.info('Saved %s profile object as file.', saved_profiles)
             else:
                 self.__log.error("Could not find any active profiles in the list.")
             return saved_profiles
