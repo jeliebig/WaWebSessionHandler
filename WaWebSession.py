@@ -19,8 +19,8 @@ from selenium.webdriver.support.ui import WebDriverWait
 
 
 class Browser(Enum):
-    CHROME = "chrome"
-    FIREFOX = "firefox"
+    CHROME = 'chrome'
+    FIREFOX = 'firefox'
 
 
 class SessionHandler:
