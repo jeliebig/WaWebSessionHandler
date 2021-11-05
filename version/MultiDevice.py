@@ -5,7 +5,7 @@ from ..SessionObject import SessionObject
 class MultiDevice(Version):
     @staticmethod
     def is_version(wa_session: SessionObject) -> bool:
-        pass
+        return "WANoiseInfo" in wa_session.local_storage.keys()
 
     def __init__(self, wa_session: SessionObject):
         pass
