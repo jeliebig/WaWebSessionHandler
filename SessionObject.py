@@ -1,4 +1,6 @@
-from typing import NoReturn, Optional, ValuesView
+import json
+import os.path
+from typing import NoReturn, Optional
 
 
 class IDBObjectStore:
@@ -6,6 +8,7 @@ class IDBObjectStore:
     auto_increment: bool
     key_path: str
     __indices: dict[str, bool]
+    # data could also be: list[dict[str, any]] - but let's leave it like that for now
     __data: list[dict[str, str]]
 
     def __is_unique_value(self, index: str, value: Optional[str]) -> bool:
@@ -14,14 +17,37 @@ class IDBObjectStore:
                 return False
         return True
 
+    @staticmethod
+    def create_from_dict(os_dict: dict):
+        required_keys = ['name', 'autoIncrement', 'keyPath', 'indices', 'data']
+        for key in required_keys:
+            if key not in os_dict.keys():
+                raise KeyError(f'Could not find key "{key}".\n'
+                               f'Make sure the dictionary contains all required keys.')
+        new_os = IDBObjectStore(os_dict['name'], os_dict['autoIncrement'], os_dict['keyPath'])
+        for name, unique in os_dict['indices'].items():
+            new_os.create_index(name, unique)
+        for data in os_dict['data']:
+            new_os.add_data(data)
+        return new_os
+
     # It's possible to pass an array to keyPath, but since I don't know how that gets handled
     # only strings can be used for now.
-    def __init__(self, name: str, auto_increment: Optional[bool] = False, key_path: Optional[str] = ""):
+    def __init__(self, name: str, auto_increment: Optional[bool] = False, key_path: Optional[str] = ''):
         self.name = name.strip()
         self.auto_increment = auto_increment
         self.key_path = key_path.strip()
         if len(key_path.strip()) > 0:
             self.__indices[key_path.strip()] = True
+
+    def as_dict(self) -> dict:
+        return {
+            'name': self.name,
+            'autoIncrement': self.auto_increment,
+            'keyPath': self.key_path,
+            'indices': self.__indices,
+            'data': self.__data
+        }
 
     def create_index(self, name: str, unique: Optional[bool] = False) -> NoReturn:
         if name.strip() not in self.__indices.keys():
@@ -57,12 +83,34 @@ class IDBDatabase:
     version: int
     __object_stores: dict[str, IDBObjectStore]
 
+    @staticmethod
+    def create_from_dict(db_dict: dict):
+        required_keys = ['name', 'version', 'objectStores']
+        for key in required_keys:
+            if key not in db_dict.keys():
+                raise KeyError(f'Could not find key "{key}".\n'
+                               f'Make sure the dictionary contains all required keys.')
+        new_db = IDBDatabase(db_dict['name'], db_dict['version'])
+        for name, object_store in db_dict['objectStores'].items():
+            new_db.add_object_store(IDBObjectStore.create_from_dict(object_store))
+        return new_db
+
     def __init__(self, name: str, version: Optional[int] = 1):
         self.name = name.strip()
         if version > 0:
             self.version = version
         else:
             raise ValueError('Version cannot be <= 0')
+
+    def as_dict(self) -> dict:
+        db_dict = {
+            'name': self.name,
+            'version': self.version,
+            'objectStores': {}
+        }
+        for name, object_store in self.__object_stores.items():
+            db_dict['objectStores'][name] = object_store.as_dict()
+        return db_dict
 
     def add_object_store(self, object_store: IDBObjectStore) -> NoReturn:
         if object_store.name not in self.__object_stores.keys():
@@ -73,16 +121,37 @@ class IDBDatabase:
     def get_object_store_num(self):
         return len(self.__object_stores)
 
-    def get_object_stores(self) -> ValuesView[IDBObjectStore]:
-        return self.__object_stores.values()
+    def get_object_stores(self) -> list[IDBObjectStore]:
+        return list(self.__object_stores.values())
 
 
 class IndexedDB:
-    url: str
+    __URL: str
     __databases: dict[str, IDBDatabase]
 
+    @staticmethod
+    def create_from_dict(idb_dict: dict):
+        required_keys = ['url', 'databases']
+        for key in required_keys:
+            if key not in idb_dict:
+                raise KeyError(f'Could not find key "{key}".\n'
+                               f'Make sure the dictionary contains all required keys.')
+        new_idb = IndexedDB(idb_dict['url'])
+        for name, database in idb_dict.items():
+            new_idb.add_db(IDBDatabase.create_from_dict(database))
+        return new_idb
+
     def __init__(self, url: str):
-        self.url = url.strip()
+        self.__URL = url.strip()
+
+    def as_dict(self) -> dict:
+        idb_dict = {'url': self.__URL, 'databases': {}}
+        for name, idb_db in self.__databases.items():
+            idb_dict['databases'][name] = idb_db.as_dict()
+        return idb_dict
+
+    def get_url(self):
+        return self.__URL
 
     def add_db(self, db: IDBDatabase) -> NoReturn:
         if db.name not in self.__databases.keys():
@@ -93,24 +162,48 @@ class IndexedDB:
     def get_db_num(self):
         return len(self.__databases)
 
-    def get_dbs(self) -> ValuesView[IDBDatabase]:
-        return self.__databases.values()
+    def get_dbs(self) -> list[IDBDatabase]:
+        return list(self.__databases.values())
 
     def get_db(self, name: str) -> IDBDatabase:
         return self.__databases[name]
 
 
 class SessionObject:
-    url: str
+    __NAME: str
+    __URL: str
+    __FILE_EXT: str
     cookies: dict[str, str]
     local_storage: dict[str, str]
     indexed_db: IndexedDB
 
-    def __init__(self, url: str,
+    @staticmethod
+    def create_from_file(path: str):
+        if os.path.isfile(path):
+            required_keys = ['name', 'url', 'fileExt', 'cookies', 'localStorage', 'indexedDb']
+            with open(path, 'r') as file:
+                session_object = json.load(file)
+
+            for key in required_keys:
+                if key not in session_object.keys():
+                    raise KeyError(f'Could not find key "{key}" in "{path}".\n'
+                                   f'Make sure the session file contains all required keys.')
+
+            return SessionObject(
+                session_object['name'], session_object['url'], session_object['fileExt'],
+                session_object['cookies'], session_object['localStorage'],
+                IndexedDB.create_from_dict(session_object['indexedDb'])
+            )
+        else:
+            raise FileNotFoundError(f'Could not find "{path}". No new session object can be created.')
+
+    def __init__(self, name: str, url: str, ext: str = 'json',
                  cookies: Optional[dict[str, str]] = None,
                  local_storage: Optional[dict[str, str]] = None,
                  indexed_db: Optional[IndexedDB] = None):
-        self.url = url.strip()
+        self.__NAME = name.strip()
+        self.__URL = url.strip()
+        self.__FILE_EXT = ext.strip()
         if cookies:
             self.cookies = cookies
         else:
@@ -122,4 +215,27 @@ class SessionObject:
         if indexed_db:
             self.indexed_db = indexed_db
         else:
-            self.indexed_db = IndexedDB(self.url)
+            self.indexed_db = IndexedDB(self.__URL)
+
+    def save_to_file(self, path: str):
+        session_object = {
+            'name': self.__NAME,
+            'url': self.__URL,
+            'fileExt': self.__FILE_EXT,
+            'cookies': self.cookies,
+            'localStorage': self.local_storage,
+            'indexedDb': self.indexed_db
+        }
+        if not path.endswith(self.__FILE_EXT):
+            path = path + '.' + self.__FILE_EXT
+        with open(path, 'w') as file:
+            json.dump(session_object, file, indent=2)
+
+    def get_name(self):
+        return self.__NAME
+
+    def get_url(self):
+        return self.__URL
+
+    def get_file_ext(self):
+        return self.__FILE_EXT
