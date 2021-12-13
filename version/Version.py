@@ -1,11 +1,14 @@
+from abc import abstractmethod, ABC
+
 from SessionHandler.SessionObject import SessionObject
-from . import Version
 
 
-class Default(Version):
+class Version(ABC):
     @staticmethod
+    @abstractmethod
     def is_version(wa_session: SessionObject) -> bool:
-        return "WAToken1" in wa_session.local_storage.keys() and "WAToken2" in wa_session.local_storage.keys()
+        pass
 
+    @abstractmethod
     def __init__(self, wa_session: SessionObject):
         pass

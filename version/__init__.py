@@ -1,21 +1,9 @@
-from abc import abstractmethod, ABC
 from typing import Optional
 
+from SessionHandler.SessionObject import SessionObject
 from .Default import Default
 from .MultiDevice import MultiDevice
-from ..SessionObject import SessionObject
-
-
-class Version(ABC):
-    @staticmethod
-    @abstractmethod
-    def is_version(wa_session: SessionObject) -> bool:
-        pass
-
-    @abstractmethod
-    def __init__(self, wa_session: SessionObject):
-        pass
-
+from .Version import Version
 
 versions = [
     Default,
@@ -35,3 +23,10 @@ def get_version(wa_session: SessionObject) -> Optional[Version]:
         if version.is_version(wa_session):
             return version(wa_session)
     return None
+
+
+def is_any_version(wa_session: SessionObject) -> bool:
+    for version in versions:
+        if version.is_version(wa_session):
+            return True
+    return False

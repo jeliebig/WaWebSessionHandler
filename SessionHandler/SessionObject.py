@@ -1,12 +1,12 @@
 import json
 import os.path
-from typing import NoReturn, Optional
+from typing import NoReturn, Optional, Union
 
 
 class IDBObjectStore:
     name: str
     auto_increment: bool
-    key_path: str
+    key_path: list[str]
     __indices: dict[str, bool]
     # data could also be: list[dict[str, any]] - but let's leave it like that for now
     __data: list[dict[str, str]]
@@ -31,14 +31,21 @@ class IDBObjectStore:
             new_os.add_data(data)
         return new_os
 
-    # It's possible to pass an array to keyPath, but since I don't know how that gets handled
-    # only strings can be used for now.
-    def __init__(self, name: str, auto_increment: Optional[bool] = False, key_path: Optional[str] = ''):
+    def __init__(self, name: str, auto_increment: Optional[bool] = False,
+                 key_path: Optional[Union[list[str], str]] = ''):
         self.name = name.strip()
         self.auto_increment = auto_increment
-        self.key_path = key_path.strip()
-        if len(key_path.strip()) > 0:
-            self.__indices[key_path.strip()] = True
+        self.__indices = {}
+        self.__data = []
+        if isinstance(key_path, str):
+            if len(key_path.strip()) > 0:
+                self.key_path = [key_path.strip()]
+            else:
+                self.key_path = []
+        elif isinstance(key_path, list):
+            self.key_path = key_path
+        else:
+            self.key_path = []
 
     def as_dict(self) -> dict:
         return {
@@ -61,8 +68,6 @@ class IDBObjectStore:
                 if self.__indices[index]:
                     if not self.__is_unique_value(index, value):
                         raise ValueError(f'Cannot insert data. Duplicate value for unique index: {index}')
-            else:
-                raise ValueError(f'No such index in ObjectStore: {index}')
         self.__data.append(data)
 
     def get_data_num(self) -> int:
@@ -101,6 +106,7 @@ class IDBDatabase:
             self.version = version
         else:
             raise ValueError('Version cannot be <= 0')
+        self.__object_stores = {}
 
     def as_dict(self) -> dict:
         db_dict = {
@@ -137,12 +143,13 @@ class IndexedDB:
                 raise KeyError(f'Could not find key "{key}".\n'
                                f'Make sure the dictionary contains all required keys.')
         new_idb = IndexedDB(idb_dict['url'])
-        for name, database in idb_dict.items():
+        for name, database in idb_dict['databases'].items():
             new_idb.add_db(IDBDatabase.create_from_dict(database))
         return new_idb
 
     def __init__(self, url: str):
         self.__URL = url.strip()
+        self.__databases = {}
 
     def as_dict(self) -> dict:
         idb_dict = {'url': self.__URL, 'databases': {}}
@@ -197,6 +204,10 @@ class SessionObject:
         else:
             raise FileNotFoundError(f'Could not find "{path}". No new session object can be created.')
 
+    @staticmethod
+    def is_valid_session(param, param1, param2):
+        raise NotImplementedError
+
     def __init__(self, name: str, url: str, ext: str = 'json',
                  cookies: Optional[dict[str, str]] = None,
                  local_storage: Optional[dict[str, str]] = None,
@@ -239,3 +250,7 @@ class SessionObject:
 
     def get_file_ext(self):
         return self.__FILE_EXT
+
+    # TODO: Remove driver dependency
+    def get_idb_db_names(self, driver):
+        return []
