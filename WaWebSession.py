@@ -15,7 +15,7 @@ class WaWebSession(SessionObject):
     @staticmethod
     def create_from_file(path: str):
         # FIXME: I should probably use __init__ for these things and not a static method
-        new_waso = super().create_from_file(path)
+        new_waso = SessionObject.create_from_file(path)
         new_waso.__class__ = WaWebSession
         new_waso.update_version()
         return new_waso
@@ -98,6 +98,7 @@ class WaWebSession(SessionObject):
             idb_list = driver.execute_script('return document.pySessionObject.idbObject;')
             for idb_dict in idb_list:
                 idb_db_name_list.append(idb_dict['name'])
+            idb_db_name_list.append(db_name)
         self.__log.debug(f'Found databases: {idb_db_name_list}')
         driver.execute_script('document.pySessionObject = {};')
         return idb_db_name_list
@@ -138,7 +139,7 @@ if __name__ == '__main__':
         waSession = web.create_new_session()
         save_path = input('Enter a file path for the created session file: ')
         waSession.save_to_file(save_path)
-        sh_logger.info(f'Saved session to file: {save_path + waSession.get_file_ext()}')
+        sh_logger.info(f'Saved session to file: {save_path + "." + waSession.get_file_ext()}')
     elif choice == 2:
         waSessions = web.get_active_session(all_profiles=True)
         if len(waSessions) == 0:

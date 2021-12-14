@@ -1,5 +1,5 @@
 from SessionHandler.SessionObject import SessionObject
-from . import Version
+from .Version import Version
 
 
 class MultiDevice(Version):

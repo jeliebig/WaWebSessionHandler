@@ -120,92 +120,11 @@ class SessionHandler:
             self.__driver.execute_script('window.localStorage.setItem(arguments[0], arguments[1]);',
                                          ls_key, ls_val)
 
-    # def __get_indexed_db_user(self) -> 'list[dict[str, str]]':
-    #     self.__log.debug('Executing getIDBObjects function...')
-    #     # TODO: rewrite this for the general approach
-    #     self.__driver.execute_script('''
-    #     document.pySessionHandler = {};
-    #     document.pySessionHandler.idbObject = undefined;
-    #     function getAllObjects() {
-    #         document.pySessionHandler.dbName = "wawc";
-    #         document.pySessionHandler.osName = "user";
-    #         document.pySessionHandler.db = undefined;
-    #         document.pySessionHandler.transaction = undefined;
-    #         document.pySessionHandler.objectStore = undefined;
-    #         document.pySessionHandler.getAllRequest = undefined;
-    #         document.pySessionHandler.request = indexedDB.open(document.pySessionHandler.dbName);
-    #         document.pySessionHandler.request.onsuccess = function(event) {
-    #             document.pySessionHandler.db = event.target.result;
-    #             document.pySessionHandler.transaction = document.pySessionHandler.db.transaction(
-    #                 document.pySessionHandler.osName
-    #             );
-    #             document.pySessionHandler.objectStore = document.pySessionHandler.transaction.objectStore(
-    #                 document.pySessionHandler.osName
-    #             );
-    #             document.pySessionHandler.getAllRequest = document.pySessionHandler.objectStore.getAll();
-    #             document.pySessionHandler.getAllRequest.onsuccess = function(getAllEvent) {
-    #                 document.pySessionHandler.idbObject = getAllEvent.target.result;
-    #             };
-    #         };
-    #     }
-    #     getAllObjects();
-    #     ''')
-    #     self.__log.debug('Waiting until IDB operation is done...')
-    #     while not self.__driver.execute_script('return document.pySessionHandler.idbObject != undefined;'):
-    #         time.sleep(1)
-    #     self.__log.debug('Getting IDB results...')
-    #     idb_object_list: list[dict[str, str]] = self.__driver.execute_script(
-    #         'return document.pySessionHandler.idbObject;')
-    #     return idb_object_list
-
-    # def __set_indexed_db_user(self, idb_object_list: 'list[dict[str, str]]') -> NoReturn:
-    #     self.__log.debug('Inserting setIDBObjects function...')
-    #     self.__driver.execute_script('''
-    #     document.pySessionHandler = {};
-    #     document.pySessionHandler.insertDone = 0;
-    #     document.pySessionHandler.jsonObj = undefined;
-    #     document.pySessionHandler.setAllObjects = function (_jsonObj) {
-    #         document.pySessionHandler.jsonObj = _jsonObj;
-    #         document.pySessionHandler.dbName = "wawc";
-    #         document.pySessionHandler.osName = "user";
-    #         document.pySessionHandler.request = indexedDB.open(document.pySessionHandler.dbName);
-    #         document.pySessionHandler.request.onsuccess = function(event) {
-    #             document.pySessionHandler.db = event.target.result;
-    #             document.pySessionHandler.transaction = document.pySessionHandler.db.transaction(
-    #                 document.pySessionHandler.osName, "readwrite"
-    #             );
-    #             document.pySessionHandler.objectStore = document.pySessionHandler.transaction.objectStore(
-    #                 document.pySessionHandler.osName
-    #             );
-    #             document.pySessionHandler.clearRequest = document.pySessionHandler.objectStore.clear();
-    #             document.pySessionHandler.clearRequest.onsuccess = function(clearEvent) {
-    #                 for (var i = 0; i < document.pySessionHandler.jsonObj.length; i++) {
-    #                     document.pySessionHandler.addRequest = document.pySessionHandler.objectStore.add(
-    #                         document.pySessionHandler.jsonObj[i]
-    #                     );
-    #                     document.pySessionHandler.addRequest.onsuccess = function(addEvent) {
-    #                         document.pySessionHandler.insertDone++;
-    #                     };
-    #                 }
-    #             };
-    #         };
-    #     }
-    #     ''')
-    #     self.__log.debug('setIDBObjects function inserted.')
-    #
-    #     self.__log.info('Writing IDB data...')
-    #     self.__driver.execute_script('document.pySessionHandler.setAllObjects(arguments[0]);', idb_object_list)
-    #
-    #     self.__log.debug('Waiting until all objects are written to IDB...')
-    #     # FIXME: This looks awful. Please find a way to make this look a little better.
-    #     while not self.__driver.execute_script(
-    #             'return (document.pySessionHandler.insertDone == document.pySessionHandler.jsonObj.length);'):
-    #         time.sleep(1)
-
     def __get_indexed_db(self) -> IndexedDB:
         idb_dict = {'url': self.__session.get_url(), 'databases': {}}
         idb_db_names = self.__session.get_idb_db_names(self.__driver)
         self.__log.debug('Executing getIndexedDb function...')
+        # FIXME: Use driver.execute_async_script() in the future
         self.__driver.execute_script('''
         document.pySessionHandler = {};
         document.pySessionHandler.idbObject = {};
@@ -214,48 +133,52 @@ class SessionHandler:
         // This could be so easy
         // https://developer.mozilla.org/en-US/docs/Web/API/IDBFactory/databases#browser_compatibility
         // indexedDB.databases();
-        function getAllIndexedDBs() {
-            for (const dbName of document.pySessionHandler.idbNames) {
-                document.pySessionHandler.idbObject[dbName] = {};
-                document.pySessionHandler.openRequest = indexedDB.open(dbName);
-                document.pySessionHandler.openRequest.onsuccess = function(event) {
-                  document.pySessionHandler.db = event.target.result;
-                  document.pySessionHandler.idbObject[dbName]['name'] = document.pySessionHandler.db.name;
-                  document.pySessionHandler.idbObject[dbName]['version'] = document.pySessionHandler.db.version;
-                  document.pySessionHandler.idbObject[dbName]['objectStores'] = {}; 
-                  for (const objectStoreName of document.pySessionHandler.db.objectStoreNames) {
-                    document.pySessionHandler.idbObject[dbName]['objectStores'][objectStoreName] = {};
-                    document.pySessionHandler.osTransaction = document.pySessionHandler.db.transaction(
-                        objectStoreName
-                    );
-                    document.pySessionHandler.objectStore = document.pySessionHandler.osTransaction.objectStore(
-                        objectStoreName
-                    );
-                    document.pySessionHandler.idbObject[dbName]['objectStores'][objectStoreName] = {};
-                    document.pySessionHandler.idbObject[dbName]['objectStores'][objectStoreName]['name'] =
-                     objectStoreName;
-                    document.pySessionHandler.idbObject[dbName]['objectStores'][objectStoreName]['indices'] = {};
-                    for (const idbIndexName of Array.from(document.pySessionHandler.objectStore.indexNames)) {
-                        idbIndex = document.pySessionHandler.objectStore.index(idbIndexName);
-                        document.pySessionHandler.idbObject[dbName]['objectStores'][objectStoreName]['indices'][
-                            idbIndex.name
-                        ] = idbIndex.unique;
-                    }
-                    document.pySessionHandler.idbObject[dbName]['objectStores'][objectStoreName]['keyPath'] =
-                     document.pySessionHandler.objectStore.keyPath;
-                    document.pySessionHandler.idbObject[dbName]['objectStores'][objectStoreName]['autoIncrement'] =
-                     document.pySessionHandler.objectStore.autoIncrement;
-                    document.pySessionHandler.osName = objectStoreName;
-                    document.pySessionHandler.idbObject[dbName]['objectStores'][
-                    document.pySessionHandler.osName]['data'] = await new Promise((resolve, reject) => {
-                        document.pySessionHandler.osGetAllRequest = document.pySessionHandler.objectStore.getAll();
-                        document.pySessionHandler.osGetAllRequest.onsuccess = 
-                         _ => resolve(document.pySessionHandler.osGetAllRequest.target.result);
-                    });
-                  }
-                  document.pySessionHandler.idbReady++;
-                };
+        async function getAllIndexedDBs() {
+          for (const dbName of document.pySessionHandler.idbNames) {
+            document.pySessionHandler.idbObject[dbName] = {};
+            document.pySessionHandler.db = await new Promise((resolve, reject) => {
+              document.pySessionHandler.openRequest = indexedDB.open(dbName);
+              document.pySessionHandler.openRequest.onsuccess = _ => resolve(
+                document.pySessionHandler.openRequest.result
+              );
+            });
+            document.pySessionHandler.idbObject[dbName]['name'] = document.pySessionHandler.db.name;
+            document.pySessionHandler.idbObject[dbName]['version'] = document.pySessionHandler.db.version;
+            document.pySessionHandler.idbObject[dbName]['objectStores'] = {};
+            for (const objectStoreName of document.pySessionHandler.db.objectStoreNames) {
+              document.pySessionHandler.idbObject[dbName]['objectStores'][objectStoreName] = {};
+              document.pySessionHandler.osTransaction = document.pySessionHandler.db.transaction(
+                objectStoreName
+              );
+              document.pySessionHandler.objectStore = document.pySessionHandler.osTransaction.objectStore(
+                objectStoreName
+              );
+              document.pySessionHandler.idbObject[dbName]['objectStores'][objectStoreName] = {};
+              document.pySessionHandler.idbObject[dbName]['objectStores'][objectStoreName]['name'] =
+                objectStoreName;
+              document.pySessionHandler.idbObject[dbName]['objectStores'][objectStoreName]['indices'] = {};
+              for (const idbIndexName of Array.from(document.pySessionHandler.objectStore.indexNames)) {
+                idbIndex = document.pySessionHandler.objectStore.index(idbIndexName);
+                document.pySessionHandler.idbObject[dbName]['objectStores'][objectStoreName]['indices'][
+                  idbIndex.name
+                ] = {'unique': idbIndex.unique, 'keyPath': idbIndex.keyPath, 'multiEntry': idbIndex.multiEntry};
+              }
+              document.pySessionHandler.idbObject[dbName]['objectStores'][objectStoreName]['keyPath'] =
+                document.pySessionHandler.objectStore.keyPath;
+              document.pySessionHandler.idbObject[dbName]['objectStores'][objectStoreName]['autoIncrement'] =
+                document.pySessionHandler.objectStore.autoIncrement;
+              document.pySessionHandler.osName = objectStoreName;
+              document.pySessionHandler.idbObject[dbName]['objectStores'][
+                document.pySessionHandler.osName
+              ]['data'] = await new Promise((resolve, reject) => {
+                document.pySessionHandler.osGetAllRequest = document.pySessionHandler.objectStore.getAll();
+                document.pySessionHandler.osGetAllRequest.onsuccess =
+                  _ => resolve(document.pySessionHandler.osGetAllRequest.result);
+              });
             }
+            document.pySessionHandler.db.close();
+            document.pySessionHandler.idbReady++;
+          }
         }
         getAllIndexedDBs();
         ''', idb_db_names)
@@ -273,52 +196,57 @@ class SessionHandler:
         self.__log.debug('Inserting setIDBObjects function...')
         self.__driver.execute_script('''
         document.pySessionHandler = {};
-        document.pySessionHandler.idbData = undefined;
-        document.pySessionHandler.idbDbName = undefined;
-        document.pySessionHandler.idbOsName = undefined;
-        document.pySessionHandler.insertDone = 0;
-        document.pySessionHandler.setAllObjects = function (_dbName, _osName, _data) {
-            document.pySessionHandler.insertDone = 0;
-            document.pySessionHandler.idbDbName = _dbName;
-            document.pySessionHandler.idbOsName = _osName;
-            document.pySessionHandler.idbData = _data;
-            document.pySessionHandler.request = indexedDB.open(document.pySessionHandler.dbName);
-            document.pySessionHandler.request.onsuccess = function(event) {
-                document.pySessionHandler.db = event.target.result;
-                document.pySessionHandler.transaction = document.pySessionHandler.db.transaction(
-                    document.pySessionHandler.idbOsName, "readwrite"
-                );
-                document.pySessionHandler.objectStore = document.pySessionHandler.transaction.objectStore(
-                    document.pySessionHandler.idbOsName
-                );
-                document.pySessionHandler.clearRequest = document.pySessionHandler.objectStore.clear();
-                document.pySessionHandler.clearRequest.onsuccess = function(clearEvent) {
-                    for (var i = 0; i < document.pySessionHandler.idbData.length; i++) {
-                        document.pySessionHandler.addRequest = document.pySessionHandler.objectStore.add(
-                            document.pySessionHandler.idbData[i]
-                        );
-                        document.pySessionHandler.addRequest.onsuccess = function(addEvent) {
-                            document.pySessionHandler.insertDone++;
-                        };
-                    }
-                };
-            };
-        }
+        // Reference PoC: https://github.com/jeliebig/WaWebSessionHandler/issues/15#issuecomment-893716129
+        // PoC by: https://github.com/thewh1teagle
+        document.pySessionHandler.setAllObjects = async function (idb_data) {
+            idb_dbs = idb_data['databases'];
+            console.log(idb_dbs);
+            for (const [idbDbName, idbDbProps] of Object.entries(idb_dbs)) {
+                indexedDB.deleteDatabase(idbDbName);
+                await new Promise((resolve, reject) => {
+                    openRequest = indexedDB.open(idbDbName, idbDbProps['version']);
+                    openRequest.onupgradeneeded = async function(event) {
+                        db = event.target.result;
+                        
+                        for (const [idbOsName, idbOsProps] of Object.entries(idbDbProps['objectStores'])) {
+                            objectStore = db.createObjectStore(idbOsName, {
+                              autoIncrement: idbOsProps['autoIncrement'],
+                              keyPath: idbOsProps['keyPath']
+                            });
+                            
+                            for (const [idbIndexName, idbIndexOptions] of Object.entries(idbOsProps['indices'])) {
+                                objectStore.createIndex(idbIndexName, idbIndexOptions['keyPath'],{
+                                    unique: idbIndexOptions['unique'],
+                                    multiEntry: idbIndexOptions['multiEntry']
+                                });    
+                            }
+                            
+                            for (const idbOsData of idbOsProps['data']) {
+                                await new Promise((dResolve, dReject) => {
+                                    addRequest = objectStore.add(idbOsData);
+                                    addRequest.onsuccess = _ => dResolve();
+                                });
+                            }
+                        }
+                        db.close();
+                        resolve();
+                    };
+                });
+            }
+        };
+        document.pySessionHandler.setAllObjectsAsync = async function(idb_data, resolve) {
+            await document.pySessionHandler.setAllObjects(idb_data);
+            resolve();
+        };
         ''')
         self.__log.debug('setIDBObjects function inserted.')
 
         self.__log.info('Writing IDB data...')
-        for idb_db in idb.get_dbs():
-            self.__log.debug(f'Writing to idb db: {idb_db.name}')
-            for idb_os in idb_db.get_object_stores():
-                self.__log.debug(f'Writing to idb os: {idb_os.name}')
-                self.__driver.execute_script('''
-                document.pySessionHandler.setAllObjects(arguments[0], arguments[1], arguments[2]);
-                ''', idb_db.name, idb_os.name, idb_os.get_data())
-                while not self.__driver.execute_script(
-                        'return (document.pySessionHandler.insertDone == document.pySessionHandler.idbData.length);'):
-                    time.sleep(1)
-
+        self.__driver.execute_async_script('''
+        var callback = arguments[arguments.length - 1];
+        document.pySessionHandler.setAllObjectsAsync(arguments[0], callback);
+        ''', idb.as_dict())
+        # FIXME: InvalidAccessError: A parameter or an operation is not supported by the underlying object
         self.__log.info("Finished writing data to IDB!")
 
     def __verify_profile_name_exists(self, profile_name: str) -> bool:

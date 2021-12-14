@@ -7,8 +7,9 @@ class IDBObjectStore:
     name: str
     auto_increment: bool
     key_path: list[str]
-    __indices: dict[str, bool]
-    # data could also be: list[dict[str, any]] - but let's leave it like that for now
+    # TODO: Think about creating a IDBIndex class
+    __indices: dict[str, dict]
+    # data could also be: list[dict[str, object]] - but let's leave it like that for now
     __data: list[dict[str, str]]
 
     def __is_unique_value(self, index: str, value: Optional[str]) -> bool:
@@ -25,8 +26,8 @@ class IDBObjectStore:
                 raise KeyError(f'Could not find key "{key}".\n'
                                f'Make sure the dictionary contains all required keys.')
         new_os = IDBObjectStore(os_dict['name'], os_dict['autoIncrement'], os_dict['keyPath'])
-        for name, unique in os_dict['indices'].items():
-            new_os.create_index(name, unique)
+        for name, options in os_dict['indices'].items():
+            new_os.create_index(name, options)
         for data in os_dict['data']:
             new_os.add_data(data)
         return new_os
@@ -56,16 +57,25 @@ class IDBObjectStore:
             'data': self.__data
         }
 
-    def create_index(self, name: str, unique: Optional[bool] = False) -> NoReturn:
+    def create_index(self, name: str, options: Optional[dict[str, dict[str, object]]] = None) -> NoReturn:
+        if options is None:
+            options = {'unique': False}
         if name.strip() not in self.__indices.keys():
-            self.__indices[name.strip()] = unique
+            if 'unique' not in options.keys():
+                options['unique'] = False
+            if 'keyPath' not in options.keys():
+                options['keyPath'] = None
+            if 'multiEntry' not in options.keys():
+                # TODO: Figure out what the default value for multiEntry is
+                options['multiEntry'] = False
+            self.__indices[name.strip()] = options
         else:
             raise ValueError(f'Cannot create duplicate index: {name.strip()}')
 
     def add_data(self, data: dict[str, Optional[str]]) -> NoReturn:
         for index, value in data.items():
             if index in self.__indices.keys():
-                if self.__indices[index]:
+                if self.__indices[index]['unique']:
                     if not self.__is_unique_value(index, value):
                         raise ValueError(f'Cannot insert data. Duplicate value for unique index: {index}')
         self.__data.append(data)
@@ -76,7 +86,7 @@ class IDBObjectStore:
     def get_indices_num(self) -> int:
         return len(self.__indices)
 
-    def get_indices(self) -> dict[str, bool]:
+    def get_indices(self) -> dict[str, dict]:
         return self.__indices
 
     def get_data(self) -> list[dict[str, str]]:
@@ -235,7 +245,7 @@ class SessionObject:
             'fileExt': self.__FILE_EXT,
             'cookies': self.cookies,
             'localStorage': self.local_storage,
-            'indexedDb': self.indexed_db
+            'indexedDb': self.indexed_db.as_dict()
         }
         if not path.endswith(self.__FILE_EXT):
             path = path + '.' + self.__FILE_EXT
