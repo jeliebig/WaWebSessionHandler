@@ -9,10 +9,9 @@ class IDBObjectStore:
     key_path: list[str]
     # TODO: Think about creating a IDBIndex class
     __indices: dict[str, dict]
-    # data could also be: list[dict[str, object]] - but let's leave it like that for now
-    __data: list[dict[str, str]]
+    __data: list[dict[str, object]]
 
-    def __is_unique_value(self, index: str, value: Optional[str]) -> bool:
+    def __is_unique_value(self, index: str, value: Optional[object]) -> bool:
         for entry in self.__data:
             if value == entry[index]:
                 return False
@@ -72,7 +71,7 @@ class IDBObjectStore:
         else:
             raise ValueError(f'Cannot create duplicate index: {name.strip()}')
 
-    def add_data(self, data: dict[str, Optional[str]]) -> NoReturn:
+    def add_data(self, data: dict[str, Optional[object]]) -> NoReturn:
         for index, value in data.items():
             if index in self.__indices.keys():
                 if self.__indices[index]['unique']:
@@ -89,7 +88,7 @@ class IDBObjectStore:
     def get_indices(self) -> dict[str, dict]:
         return self.__indices
 
-    def get_data(self) -> list[dict[str, str]]:
+    def get_data(self) -> list[dict[str, object]]:
         return self.__data
 
 
@@ -136,6 +135,9 @@ class IDBDatabase:
 
     def get_object_store_num(self):
         return len(self.__object_stores)
+
+    def get_object_store(self, name: str) -> IDBObjectStore:
+        return self.__object_stores[name]
 
     def get_object_stores(self) -> list[IDBObjectStore]:
         return list(self.__object_stores.values())
@@ -190,6 +192,8 @@ class SessionObject:
     __NAME: str
     __URL: str
     __FILE_EXT: str
+    # I was not able to come up with a better name
+    idb_special_treatment: bool
     cookies: dict[str, str]
     local_storage: dict[str, str]
     indexed_db: IndexedDB
@@ -225,6 +229,7 @@ class SessionObject:
         self.__NAME = name.strip()
         self.__URL = url.strip()
         self.__FILE_EXT = ext.strip()
+        self.idb_special_treatment = False
         if cookies:
             self.cookies = cookies
         else:
@@ -262,5 +267,20 @@ class SessionObject:
         return self.__FILE_EXT
 
     # TODO: Remove driver dependency
-    def get_idb_db_names(self, driver):
-        return []
+    def get_idb_db_names(self, driver) -> list[str]:
+        raise NotImplementedError
+
+    # ---- Not sure if this is a good idea ----
+
+    # special treatment
+    def get_idb_st_layout(self) -> dict[str, list[str]]:
+        raise NotImplementedError
+
+    # special treatment
+    # TODO: Type hint looks crazy, maybe you should create an alias...
+    def do_idb_st_get_action(self, driver) -> dict[str, dict[str, list[dict[str, object]]]]:
+        raise NotImplementedError
+
+    # special treatment
+    def do_idb_st_set_action(self, driver, data: dict[str, dict[str, list[dict[str, object]]]]):
+        raise NotImplementedError

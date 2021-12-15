@@ -123,6 +123,10 @@ class SessionHandler:
     def __get_indexed_db(self) -> IndexedDB:
         idb_dict = {'url': self.__session.get_url(), 'databases': {}}
         idb_db_names = self.__session.get_idb_db_names(self.__driver)
+        if self.__session.idb_special_treatment:
+            idb_st_layout = self.__session.get_idb_st_layout()
+        else:
+            idb_st_layout = None
         self.__log.debug('Executing getIndexedDb function...')
         # FIXME: Use driver.execute_async_script() in the future
         self.__driver.execute_script('''
@@ -130,6 +134,7 @@ class SessionHandler:
         document.pySessionHandler.idbObject = {};
         document.pySessionHandler.idbReady = 0;
         document.pySessionHandler.idbNames = arguments[0];
+        document.pySessionHandler.idbStLayout = arguments[1];
         // This could be so easy
         // https://developer.mozilla.org/en-US/docs/Web/API/IDBFactory/databases#browser_compatibility
         // indexedDB.databases();
@@ -168,20 +173,27 @@ class SessionHandler:
               document.pySessionHandler.idbObject[dbName]['objectStores'][objectStoreName]['autoIncrement'] =
                 document.pySessionHandler.objectStore.autoIncrement;
               document.pySessionHandler.osName = objectStoreName;
-              document.pySessionHandler.idbObject[dbName]['objectStores'][
-                document.pySessionHandler.osName
-              ]['data'] = await new Promise((resolve, reject) => {
-                document.pySessionHandler.osGetAllRequest = document.pySessionHandler.objectStore.getAll();
-                document.pySessionHandler.osGetAllRequest.onsuccess =
-                  _ => resolve(document.pySessionHandler.osGetAllRequest.result);
-              });
+              if (document.pySessionHandler.idbStLayout != null &&
+                document.pySessionHandler.idbStLayout[dbName] != undefined &&
+                document.pySessionHandler.idbStLayout[dbName][document.pySessionHandler.osName] != undefined) {
+                    document.pySessionHandler.idbObject[dbName]['objectStores'][document.pySessionHandler.osName]['data']
+                     = []; 
+              }
+              else {
+                document.pySessionHandler.idbObject[dbName]['objectStores'][document.pySessionHandler.osName]['data']
+                 = await new Promise((resolve, reject) => {
+                    document.pySessionHandler.osGetAllRequest = document.pySessionHandler.objectStore.getAll();
+                    document.pySessionHandler.osGetAllRequest.onsuccess =
+                      _ => resolve(document.pySessionHandler.osGetAllRequest.result);
+                });
+              }
             }
             document.pySessionHandler.db.close();
             document.pySessionHandler.idbReady++;
           }
         }
         getAllIndexedDBs();
-        ''', idb_db_names)
+        ''', idb_db_names, idb_st_layout)
         self.__log.debug('Waiting until IDB operation is done...')
         while not self.__driver.execute_script(
                 f'return document.pySessionHandler.idbReady == {len(idb_db_names)};'):
@@ -190,6 +202,11 @@ class SessionHandler:
         idb_dict['databases'] = self.__driver.execute_script(
             'return document.pySessionHandler.idbObject;')
         self.__driver.execute_script('document.pySessionHandler = {};')
+        if idb_st_layout is not None:
+            st_data = self.__session.do_idb_st_get_action(self.__driver)
+            for idb_st_db, idb_st_os_list in idb_st_layout.items():
+                for idb_st_os in idb_st_os_list:
+                    idb_dict['databases'][idb_st_db]['objectStores'][idb_st_os]['data'] = st_data[idb_st_db][idb_st_os]
         return IndexedDB.create_from_dict(idb_dict)
 
     def __set_indexed_db(self, idb: IndexedDB) -> NoReturn:
@@ -198,11 +215,14 @@ class SessionHandler:
         document.pySessionHandler = {};
         // Reference PoC: https://github.com/jeliebig/WaWebSessionHandler/issues/15#issuecomment-893716129
         // PoC by: https://github.com/thewh1teagle
-        document.pySessionHandler.setAllObjects = async function (idb_data) {
+        document.pySessionHandler.setAllObjects = async function (idb_data, stLayout) {
             idb_dbs = idb_data['databases'];
-            console.log(idb_dbs);
             for (const [idbDbName, idbDbProps] of Object.entries(idb_dbs)) {
-                indexedDB.deleteDatabase(idbDbName);
+                await new Promise((resolve, reject) => {
+                    deleteRequest = indexedDB.deleteDatabase(idbDbName);
+                    deleteRequest.onsuccess = _ => resolve(_);
+                    deleteRequest.onerror = _ => resolve(_);
+                });
                 await new Promise((resolve, reject) => {
                     openRequest = indexedDB.open(idbDbName, idbDbProps['version']);
                     openRequest.onupgradeneeded = async function(event) {
@@ -220,21 +240,24 @@ class SessionHandler:
                                     multiEntry: idbIndexOptions['multiEntry']
                                 });    
                             }
-                            
-                            for (const idbOsData of idbOsProps['data']) {
-                                await new Promise((dResolve, dReject) => {
-                                    addRequest = objectStore.add(idbOsData);
-                                    addRequest.onsuccess = _ => dResolve();
-                                });
+                            if (!(stLayout != null &&
+                             stLayout[idbDbName] != undefined && stLayout[idbDbName][idbOsName] != undefined)) {
+                                for (const idbOsData of idbOsProps['data']) {
+                                    await new Promise((dResolve, dReject) => {
+                                        addRequest = objectStore.add(idbOsData);
+                                        addRequest.onsuccess = _ => dResolve();
+                                    });
+                                }   
                             }
                         }
                         db.close();
                         resolve();
-                    };
+                    }
                 });
             }
         };
         document.pySessionHandler.setAllObjectsAsync = async function(idb_data, resolve) {
+            console.log(idb_data);
             await document.pySessionHandler.setAllObjects(idb_data);
             resolve();
         };
@@ -246,7 +269,15 @@ class SessionHandler:
         var callback = arguments[arguments.length - 1];
         document.pySessionHandler.setAllObjectsAsync(arguments[0], callback);
         ''', idb.as_dict())
-        # FIXME: InvalidAccessError: A parameter or an operation is not supported by the underlying object
+        if self.__session.idb_special_treatment:
+            st_layout = self.__session.get_idb_st_layout()
+            st_data = {}
+            for st_db, st_os_list in st_layout.items():
+                st_data[st_db] = {}
+                for st_os in st_os_list:
+                    st_data[st_db][st_os] = idb.get_db(st_db).get_object_store(st_os).get_data()
+            self.__session.do_idb_st_set_action(self.__driver, st_data)
+
         self.__log.info("Finished writing data to IDB!")
 
     def __verify_profile_name_exists(self, profile_name: str) -> bool:
