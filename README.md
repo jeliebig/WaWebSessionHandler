@@ -1,10 +1,26 @@
 # WaWebSessionHandler
 
-Save WhatsApp Web Sessions to files and run them everywhere! 
+Save WhatsApp Web Sessions to files and run them everywhere!
+
+## NOTE
+
+This README file is outdated and doesn't properly reflect the current state of this project. It will be updated soon.
+
+## Credits
+
+- [thewh1teagle](https://github.com/thewh1teagle)
+    - for providing a [PoC](https://github.com/jeliebig/WaWebSessionHandler/issues/15#issuecomment-893716129) that I
+      used as a reference for `SessionHandler.__set_indexed_db()`.
+    - for providing a lot of useful [information](https://github.com/jeliebig/WaWebSessionHandler/issues/15) about the
+      multi-device beta.
+
+## --- OUTDATED ---
 
 ## Requirements:
 
 If you want to run the .py file you will need:
+
+- Python 3
 - Chrome or Firefox
 - Selenium (pip install selenium)
 - Chromedriver and/or Geckodriver
