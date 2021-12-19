@@ -43,9 +43,14 @@ class IDBObjectStore:
             else:
                 self.key_path = []
         elif isinstance(key_path, list):
+            if self.auto_increment and len(key_path) > 1:
+                raise ValueError('Can not create objectStore with autoInc if keyPath is empty or an array.')
             self.key_path = key_path
         else:
-            self.key_path = []
+            if not self.auto_increment:
+                self.key_path = []
+            else:
+                raise ValueError('Can not create objectStore with autoInc if keyPath is empty.')
 
     def as_dict(self) -> dict:
         return {
@@ -266,8 +271,7 @@ class SessionObject:
     def get_file_ext(self):
         return self.__FILE_EXT
 
-    # TODO: Remove driver dependency
-    def get_idb_db_names(self, driver) -> list[str]:
+    def get_idb_db_names(self) -> list[str]:
         raise NotImplementedError
 
     # ---- Not sure if this is a good idea ----

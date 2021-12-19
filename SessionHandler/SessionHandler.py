@@ -124,6 +124,7 @@ class SessionHandler:
         idb_dict = {'url': self.__session.get_url(), 'databases': {}}
         idb_db_names = self.__session.get_idb_db_names(self.__driver)
         if self.__session.idb_special_treatment:
+            self.__log.info("IDB special treatment required.")
             idb_st_layout = self.__session.get_idb_st_layout()
         else:
             idb_st_layout = None
@@ -203,6 +204,7 @@ class SessionHandler:
             'return document.pySessionHandler.idbObject;')
         self.__driver.execute_script('document.pySessionHandler = {};')
         if idb_st_layout is not None:
+            self.__log.info("Running special actions...")
             st_data = self.__session.do_idb_st_get_action(self.__driver)
             for idb_st_db, idb_st_os_list in idb_st_layout.items():
                 for idb_st_os in idb_st_os_list:
@@ -229,12 +231,20 @@ class SessionHandler:
                         db = event.target.result;
                         
                         for (const [idbOsName, idbOsProps] of Object.entries(idbDbProps['objectStores'])) {
-                            objectStore = db.createObjectStore(idbOsName, {
-                              autoIncrement: idbOsProps['autoIncrement'],
-                              keyPath: idbOsProps['keyPath']
-                            });
-                            
+                            console.log("OS:", idbOsName, idbOsProps);
+                            objectStoreOptions = {
+                              autoIncrement: idbOsProps['autoIncrement']
+                            };
+                            if (idbOsProps['keyPath'].length > 0){
+                               objectStoreOptions['keyPath'] = (idbOsProps['keyPath'].length == 1 ?
+                                idbOsProps['keyPath'].join('') : idbOsProps['keyPath']);
+                            }
+                            objectStore = db.createObjectStore(idbOsName, objectStoreOptions);
+                            containsUniqueIndex = false; 
                             for (const [idbIndexName, idbIndexOptions] of Object.entries(idbOsProps['indices'])) {
+                                if (idbIndexOptions['unique']) {
+                                    containsUniqueIndex = true;
+                                } 
                                 objectStore.createIndex(idbIndexName, idbIndexOptions['keyPath'],{
                                     unique: idbIndexOptions['unique'],
                                     multiEntry: idbIndexOptions['multiEntry']
@@ -242,11 +252,21 @@ class SessionHandler:
                             }
                             if (!(stLayout != null &&
                              stLayout[idbDbName] != undefined && stLayout[idbDbName][idbOsName] != undefined)) {
+                                i = 1;
                                 for (const idbOsData of idbOsProps['data']) {
-                                    await new Promise((dResolve, dReject) => {
-                                        addRequest = objectStore.add(idbOsData);
-                                        addRequest.onsuccess = _ => dResolve();
-                                    });
+                                    if (containsUniqueIndex || idbOsProps['keyPath'].length > 0) {
+                                        await new Promise((dResolve, dReject) => {
+                                            addRequest = objectStore.add(idbOsData);
+                                            addRequest.onsuccess = _ => dResolve();
+                                        });
+                                    }
+                                    else {
+                                        await new Promise((dResolve, dReject) => {
+                                            addRequest = objectStore.add(idbOsData, i);
+                                            addRequest.onsuccess = _ => dResolve();
+                                        });
+                                    }
+                                    i++;
                                 }   
                             }
                         }
@@ -256,9 +276,9 @@ class SessionHandler:
                 });
             }
         };
-        document.pySessionHandler.setAllObjectsAsync = async function(idb_data, resolve) {
-            console.log(idb_data);
-            await document.pySessionHandler.setAllObjects(idb_data);
+        document.pySessionHandler.setAllObjectsAsync = async function(idb_data, stLayout, resolve) {
+            console.log(idb_data, stLayout);
+            await document.pySessionHandler.setAllObjects(idb_data, stLayout);
             resolve();
         };
         ''')
@@ -267,9 +287,10 @@ class SessionHandler:
         self.__log.info('Writing IDB data...')
         self.__driver.execute_async_script('''
         var callback = arguments[arguments.length - 1];
-        document.pySessionHandler.setAllObjectsAsync(arguments[0], callback);
-        ''', idb.as_dict())
+        document.pySessionHandler.setAllObjectsAsync(arguments[0], arguments[1], callback);
+        ''', idb.as_dict(), self.__session.get_idb_st_layout() if self.__session.idb_special_treatment else None)
         if self.__session.idb_special_treatment:
+            self.__log.info("IDB special treatment required. Running special actions...")
             st_layout = self.__session.get_idb_st_layout()
             st_data = {}
             for st_db, st_os_list in st_layout.items():
