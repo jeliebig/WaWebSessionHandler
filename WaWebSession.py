@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import logging
 import os
-import time
 from typing import NoReturn, Optional
 
 import version
@@ -11,8 +10,6 @@ from SessionHandler import *
 class WaWebSession(SessionObject):
     __version: version.Version
     __log: logging.Logger
-    __idb_st_layout = {'fts-storage': ['fts-v3-index']}
-    __idb_st_key_map = {'fts-v3-index': 'prefixes'}
 
     @staticmethod
     def create_from_file(path: str):
@@ -20,6 +17,7 @@ class WaWebSession(SessionObject):
         new_waso = SessionObject.create_from_file(path)
         new_waso.__class__ = WaWebSession
         new_waso.update_version()
+        new_waso.update_logger()
         return new_waso
 
     @staticmethod
@@ -37,7 +35,7 @@ class WaWebSession(SessionObject):
                  indexed_db: Optional[IndexedDB] = None):
         # waso: WhatsApp (Web) Session Object
         super().__init__('WhatsApp Web', 'https://web.whatsapp.com/', 'waso', cookies, local_storage, indexed_db)
-        self.idb_special_treatment = True
+        self.idb_special_treatment = False
 
         self.__log = logging.getLogger('SessionHandler')
 
@@ -46,6 +44,9 @@ class WaWebSession(SessionObject):
             if self.__version is None:
                 raise ValueError('WhatsApp Web version could not be identified.\n'
                                  'Please check if the SessionObject is valid.')
+
+    def update_logger(self, name='SessionHandler') -> NoReturn:
+        self.__log = logging.getLogger(name)
 
     def get_version(self) -> version.Version:
         return self.__version
@@ -60,138 +61,18 @@ class WaWebSession(SessionObject):
         self.local_storage = local_storage
         self.indexed_db = indexed_db
 
-    def get_idb_db_names(self, driver) -> list:
-        wa_idb_names_idb_os_dict = {'__dbnames': 'dbnames'}
-        idb_db_name_list = []
-        if not driver.current_url.startswith(self.get_url()):
-            driver.get(self.get_url())
-            # time.sleep(1)
-
-        for db_name, os_name in wa_idb_names_idb_os_dict.items():
-            driver.execute_script('''
-            console.log(arguments);
-            document.pySessionObject = {};
-            document.pySessionObject.idbObject = {};
-            document.pySessionObject.idbObjectReady = false;
-            document.pySessionObject.dbName = arguments[0];
-            document.pySessionObject.osName = arguments[1];
-            function getAllIDBNames() {
-                document.pySessionObject.request = indexedDB.open(document.pySessionObject.dbName);
-                document.pySessionObject.request.onsuccess = function(event) {
-                    document.pySessionObject.db = event.target.result;
-                    document.pySessionObject.transaction = document.pySessionObject.db.transaction(
-                        document.pySessionObject.osName
-                    );
-                    document.pySessionObject.objectStore = document.pySessionObject.transaction.objectStore(
-                        document.pySessionObject.osName
-                    );
-                    document.pySessionObject.getAllRequest = document.pySessionObject.objectStore.getAll();
-                    document.pySessionObject.getAllRequest.onsuccess = function(getAllEvent) {
-                        document.pySessionObject.idbObject = getAllEvent.target.result;
-                        document.pySessionObject.idbObjectReady = true;
-                    };
-                };
-            }
-            getAllIDBNames();
-            ''', db_name, os_name)
-            self.__log.debug('Waiting for idbObject...')
-            while not driver.execute_script('return document.pySessionObject.idbObjectReady == true;'):
-                time.sleep(1)
-            self.__log.debug('Getting data...')
-            idb_list = driver.execute_script('return document.pySessionObject.idbObject;')
-            for idb_dict in idb_list:
-                idb_db_name_list.append(idb_dict['name'])
-            idb_db_name_list.append(db_name)
-        self.__log.debug(f'Found databases: {idb_db_name_list}')
-        driver.execute_script('document.pySessionObject = {};')
-        return idb_db_name_list
+    def get_idb_db_names(self) -> list:
+        # FIXME: wawc_db_enc CryptoKeys do not get dumped correctly
+        return ["wawc", "wawc_db_enc", "signal-storage", "model-storage"]
 
     def get_idb_st_layout(self) -> dict[str, list[str]]:
-        return self.__idb_st_layout
+        raise NotImplementedError
 
-    # FIXME: ArrayBuffers are still empty
-    # each item is 0 for some reason
     def do_idb_st_get_action(self, driver) -> dict[str, object]:
-        return driver.execute_async_script('''
-            async function getAction(stLayout, stKeyMap) {
-                data = {};
-                for (const [idbDbName, idbOsNames] of Object.entries(stLayout)) {
-                    data[idbDbName] = {};
-                    var db = await new Promise((resolve, reject) => {
-                        openRequest = indexedDB.open(idbDbName);
-                        openRequest.onsuccess = _ => resolve(openRequest.result);
-                    });
-                    
-                    for (idbOsName of idbOsNames) {
-                        transaction = db.transaction(idbOsName);
-                        var os = transaction.objectStore(idbOsName);
-                        data[idbDbName][idbOsName] = await new Promise((resolve, reject) => {
-                            getAllRequest = os.getAll();
-                            getAllRequest.onsuccess = _ => resolve(getAllRequest.result);
-                        });
-                        stKey = stKeyMap[idbOsName];
-                        for (var i=0; i<data[idbDbName][idbOsName].length;i++) {
-                            data[idbDbName][idbOsName][i][stKey] = Array.from(
-                                new Uint8Array(data[idbDbName][idbOsName][i][stKey])
-                            );
-                        }
-                    }
-                    db.close();
-                }
-                return data;
-            }
-            
-            async function callGetAction(stLayout, stKeyMap, resolve) {
-                data = await getAction(stLayout, stKeyMap);
-                resolve(data);
-            }
-            
-            var callback = arguments[arguments.length - 1];
-            callGetAction(arguments[0], arguments[1], callback);
-        ''', self.__idb_st_layout, self.__idb_st_key_map)
+        raise NotImplementedError
 
     def do_idb_st_set_action(self, driver, data: dict[str, dict[str, list[dict[str, object]]]]):
-        return driver.execute_async_script('''
-            async function setAction(data, stLayout, stKeyMap) {
-                for (const [idbDbName, idbOsNames] of Object.entries(stLayout)) {
-                    var db = await new Promise((resolve, reject) => {
-                        openRequest = indexedDB.open(idbDbName);
-                        openRequest.onsuccess = _ => resolve(openRequest.result);
-                    });
-
-                    for (idbOsName of idbOsNames) {
-                        transaction = db.transaction(idbOsName, "readwrite");
-                        var os = transaction.objectStore(idbOsName);
-                        await new Promise((resolve, reject) => {
-                            clearRequest = os.clear();
-                            clearRequest.onsuccess = _ => resolve();
-                        });
-                        stKey = stKeyMap[idbOsName];
-                        for (let entry of data[idbDbName][idbOsName]) {
-                            entry[stKey] = new Uint8Array(entry[stKey]).buffer;
-                            await new Promise((resolve, reject) => {
-                                addRequest = os.add(entry);
-                                addRequest.onsuccess = _ => resolve();
-                            });   
-                        }
-                        console.log("here");
-                        await new Promise((resolve, reject) => {
-                            transaction.onsuccess = _ => resolve();
-                        });
-                        console.log("over here");
-                    }
-                    db.close();
-                }
-            }
-
-            async function callSetAction(data, stLayout, stKeyMap, resolve) {
-                await setAction(data, stLayout, stKeyMap);
-                resolve();
-            }
-
-            var callback = arguments[arguments.length - 1];
-            callSetAction(arguments[0], arguments[1], arguments[2], callback);
-        ''', data, self.__idb_st_layout, self.__idb_st_key_map)
+        raise NotImplementedError
 
 
 if __name__ == '__main__':
